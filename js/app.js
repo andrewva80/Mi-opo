@@ -32,6 +32,7 @@ let estado = {
   temaActivoId: null,
   categoriaActiva: "esquemas",
   historialChat: [],
+  carpetasCerradas: new Set(), // guarda "bloque::nombreCarpeta"
 };
 
 // ---------- Arranque ----------
@@ -198,13 +199,51 @@ function todosTemasBloque(bloque) {
 function renderSidebar() {
   const listaComun = document.getElementById("lista-comun");
   const listaEspecifico = document.getElementById("lista-especifico");
-  listaComun.innerHTML = "";
-  listaEspecifico.innerHTML = "";
+  renderListaBloque(listaComun, "comun");
+  renderListaBloque(listaEspecifico, estado.oposicionActiva);
+}
 
-  todosTemasBloque("comun").forEach((tema) => listaComun.appendChild(renderTemaItem(tema, "comun")));
-  todosTemasBloque(estado.oposicionActiva).forEach((tema) =>
-    listaEspecifico.appendChild(renderTemaItem(tema, estado.oposicionActiva))
-  );
+// Agrupa los temas de un bloque por carpeta (los que no tienen carpeta van sueltos arriba)
+function agruparPorCarpeta(temas) {
+  const grupos = new Map(); // carpeta (o null) -> [temas]
+  temas.forEach((t) => {
+    const key = t.carpeta || null;
+    if (!grupos.has(key)) grupos.set(key, []);
+    grupos.get(key).push(t);
+  });
+  return grupos;
+}
+
+function renderListaBloque(ul, bloque) {
+  ul.innerHTML = "";
+  const temas = todosTemasBloque(bloque);
+  const grupos = agruparPorCarpeta(temas);
+
+  // primero los temas sin carpeta
+  (grupos.get(null) || []).forEach((tema) => ul.appendChild(renderTemaItem(tema, bloque)));
+
+  // luego cada carpeta, como grupo plegable
+  grupos.forEach((lista, carpeta) => {
+    if (carpeta === null) return;
+    const key = `${bloque}::${carpeta}`;
+    const cerrada = estado.carpetasCerradas.has(key);
+
+    const liFolder = document.createElement("li");
+    liFolder.className = "folder-header";
+    liFolder.innerHTML = `<span class="folder-arrow">${cerrada ? "▸" : "▾"}</span>
+      <span style="flex:1">📁 ${escapeHtml(carpeta)}</span>
+      <span class="folder-count">${lista.length}</span>`;
+    liFolder.addEventListener("click", () => {
+      if (cerrada) estado.carpetasCerradas.delete(key);
+      else estado.carpetasCerradas.add(key);
+      renderSidebar();
+    });
+    ul.appendChild(liFolder);
+
+    if (!cerrada) {
+      lista.forEach((tema) => ul.appendChild(renderTemaItem(tema, bloque, true)));
+    }
+  });
 }
 
 function diasDesde(fechaIso) {
@@ -212,14 +251,51 @@ function diasDesde(fechaIso) {
   return Math.floor((Date.now() - new Date(fechaIso).getTime()) / 86400000);
 }
 
-function renderTemaItem(tema, bloque) {
+function renderTemaItem(tema, bloque, indentado = false) {
   const li = document.createElement("li");
-  li.className = "tema-item" + (tema.id === estado.temaActivoId ? " active" : "");
+  li.className = "tema-item" + (tema.id === estado.temaActivoId ? " active" : "") + (indentado ? " indentado" : "");
   const dias = diasDesde(tema.ultimaRevision);
   const flagClase = dias >= DIAS_URGENTE ? "overdue" : dias >= DIAS_AVISO ? "due" : "";
-  li.innerHTML = `<span class="tema-flag ${flagClase}"></span><span style="flex:1">${emojiTema(tema)} ${escapeHtml(tema.nombre)}</span>`;
-  li.addEventListener("click", () => abrirTema(tema.id, bloque));
+  li.innerHTML = `<span class="tema-flag ${flagClase}"></span>
+    <span class="tema-nombre">${emojiTema(tema)} ${escapeHtml(tema.nombre)}</span>
+    <span class="tema-controles">
+      <button class="item-btn" data-accion="subir" title="Subir">▲</button>
+      <button class="item-btn" data-accion="bajar" title="Bajar">▼</button>
+      <button class="item-btn" data-accion="editar" title="Editar">✎</button>
+    </span>`;
+  li.querySelector(".tema-nombre").addEventListener("click", () => abrirTema(tema.id, bloque));
+  li.querySelector('[data-accion="subir"]').addEventListener("click", (e) => {
+    e.stopPropagation();
+    moverTema(bloque, tema.id, -1);
+  });
+  li.querySelector('[data-accion="bajar"]').addEventListener("click", (e) => {
+    e.stopPropagation();
+    moverTema(bloque, tema.id, 1);
+  });
+  li.querySelector('[data-accion="editar"]').addEventListener("click", (e) => {
+    e.stopPropagation();
+    abrirModalEditarTema(tema.id, bloque);
+  });
   return li;
+}
+
+async function moverTema(bloque, temaId, direccion) {
+  const arr = estado.temario[bloque];
+  const tema = arr.find((t) => t.id === temaId);
+  if (!tema) return;
+  const carpeta = tema.carpeta || null;
+  const grupo = arr.filter((t) => (t.carpeta || null) === carpeta);
+  const posEnGrupo = grupo.findIndex((t) => t.id === temaId);
+  const nuevaPos = posEnGrupo + direccion;
+  if (nuevaPos < 0 || nuevaPos >= grupo.length) return; // ya está en el extremo
+  const otro = grupo[nuevaPos];
+  const i1 = arr.findIndex((t) => t.id === tema.id);
+  const i2 = arr.findIndex((t) => t.id === otro.id);
+  [arr[i1], arr[i2]] = [arr[i2], arr[i1]];
+  renderSidebar();
+  setSyncStatus("guardando...");
+  await guardarIndice(`Reordena temas en "${bloque}"`);
+  setSyncStatus("sincronizado");
 }
 
 function buscarTema(id) {
@@ -281,14 +357,16 @@ function renderFileList(categoria) {
 
 // ---------- Crear / borrar temas ----------
 
-function selectStyle() {
-  return "width:100%;padding:10px;border-radius:6px;background:var(--ink-soft);color:var(--paper);border:1px solid var(--line-strong);";
+function carpetasExistentes(bloque) {
+  const set = new Set();
+  todosTemasBloque(bloque).forEach((t) => { if (t.carpeta) set.add(t.carpeta); });
+  return [...set];
 }
 
-function opcionesTipo(bloque) {
-  return tiposParaBloque(bloque)
-    .map((t) => `<option value="${t}">${TIPOS_TEMA[t].emoji} ${TIPOS_TEMA[t].label}</option>`)
-    .join("");
+function datalistCarpetas(bloque, id) {
+  return `<datalist id="${id}">${carpetasExistentes(bloque)
+    .map((c) => `<option value="${escapeHtml(c)}">`)
+    .join("")}</datalist>`;
 }
 
 function abrirModalNuevoTema() {
@@ -311,6 +389,10 @@ function abrirModalNuevoTema() {
         ${opcionesTipo("comun")}
       </select>
     </label>
+    <label class="field"><span>Carpeta (opcional, para agrupar varios temas)</span>
+      <input type="text" id="nuevo-tema-carpeta" list="lista-carpetas-nuevo" placeholder="p. ej. Leyes">
+      ${datalistCarpetas("comun", "lista-carpetas-nuevo")}
+    </label>
     <div style="display:flex; gap:10px; margin-top:16px;">
       <button class="btn btn-primary" id="confirmar-nuevo-tema">Crear tema</button>
       <button class="btn btn-ghost" id="cancelar-nuevo-tema">Cancelar</button>
@@ -318,8 +400,10 @@ function abrirModalNuevoTema() {
   `);
   const selectBloque = document.getElementById("nuevo-tema-bloque");
   const selectTipo = document.getElementById("nuevo-tema-tipo");
+  const inputCarpeta = document.getElementById("nuevo-tema-carpeta");
   selectBloque.addEventListener("change", () => {
     selectTipo.innerHTML = opcionesTipo(selectBloque.value);
+    document.getElementById("lista-carpetas-nuevo").outerHTML = datalistCarpetas(selectBloque.value, "lista-carpetas-nuevo");
   });
 
   document.getElementById("cancelar-nuevo-tema").addEventListener("click", cerrarModal);
@@ -327,11 +411,13 @@ function abrirModalNuevoTema() {
     const nombre = val("nuevo-tema-nombre");
     const bloque = selectBloque.value;
     const tipo = selectTipo.value;
+    const carpeta = inputCarpeta.value.trim() || null;
     if (!nombre) return;
     const tema = {
       id: "t_" + Date.now().toString(36),
       nombre,
       tipo,
+      carpeta,
       ultimaRevision: null,
       archivos: { esquemas: [], ejercicios: [], examenes: [] },
     };
@@ -343,6 +429,45 @@ function abrirModalNuevoTema() {
     setSyncStatus("sincronizado");
     renderSidebar();
     abrirTema(tema.id, bloque);
+  });
+}
+
+function abrirModalEditarTema(temaId, bloque) {
+  const tema = todosTemasBloque(bloque).find((t) => t.id === temaId);
+  if (!tema) return;
+  abrirModal(`
+    <h2 style="margin-bottom:14px;">Editar tema</h2>
+    <label class="field"><span>Nombre del tema</span>
+      <input type="text" id="editar-tema-nombre" value="${escapeHtml(tema.nombre)}">
+    </label>
+    <label class="field"><span>Tipo (para el icono)</span>
+      <select id="editar-tema-tipo" style="${selectStyle()}">
+        ${opcionesTipo(bloque)}
+      </select>
+    </label>
+    <label class="field"><span>Carpeta (vacío = sin carpeta, suelto en el lateral)</span>
+      <input type="text" id="editar-tema-carpeta" list="lista-carpetas-editar" value="${escapeHtml(tema.carpeta || "")}" placeholder="p. ej. Leyes">
+      ${datalistCarpetas(bloque, "lista-carpetas-editar")}
+    </label>
+    <div style="display:flex; gap:10px; margin-top:16px;">
+      <button class="btn btn-primary" id="confirmar-editar-tema">Guardar cambios</button>
+      <button class="btn btn-ghost" id="cancelar-editar-tema">Cancelar</button>
+    </div>
+  `);
+  document.getElementById("editar-tema-tipo").value = tema.tipo || tiposParaBloque(bloque)[0];
+  document.getElementById("cancelar-editar-tema").addEventListener("click", cerrarModal);
+  document.getElementById("confirmar-editar-tema").addEventListener("click", async () => {
+    const nombre = val("editar-tema-nombre");
+    if (!nombre) return;
+    tema.nombre = nombre;
+    tema.tipo = document.getElementById("editar-tema-tipo").value;
+    tema.carpeta = document.getElementById("editar-tema-carpeta").value.trim() || null;
+    cerrarModal();
+    setSyncStatus("guardando...");
+    await guardarIndice(`Edita tema "${nombre}"`);
+    setSyncStatus("sincronizado");
+    renderSidebar();
+    if (estado.temaActivoId === temaId) mostrarTemaView();
   });
 }
 
