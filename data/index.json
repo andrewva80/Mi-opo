@@ -6,7 +6,16 @@
       "tipo": "ivaspe",
       "ultimaRevision": null,
       "archivos": {
-        "esquemas": [],
+        "esquemas": [
+          {
+            "nombre": "Tema 5 Accidentes de tráfico.pdf",
+            "path": "files/comun/t_mtset9vg/esquemas/1788856260000-Tema_5_Accidentes_de_tra_fico.pdf",
+            "sha": "bead2afdbe6385c93df66e160d2351d496708f69",
+            "url": "https://raw.githubusercontent.com/andrewva80/Mi-opo/main/files/comun/t_mtset9vg/esquemas/1788856260000-Tema_5_Accidentes_de_tra_fico.pdf",
+            "tipo": "application/pdf",
+            "subidoEl": "2026-09-08T08:31:05.771Z"
+          }
+        ],
         "ejercicios": [],
         "examenes": []
       }
