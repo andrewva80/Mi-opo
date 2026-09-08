@@ -45,6 +45,34 @@ const GitHubStorage = (() => {
     });
   }
 
+  function toBase64Json(obj) {
+    return btoa(unescape(encodeURIComponent(JSON.stringify(obj, null, 2))));
+  }
+  function fromBase64Json(content) {
+    return JSON.parse(decodeURIComponent(escape(atob(content))));
+  }
+
+  // Lee cualquier archivo JSON del repo. Si no existe, devuelve data:null (sin error).
+  async function readJsonFile(path) {
+    const res = await apiRequest(path);
+    if (res.status === 404) return { data: null, sha: null };
+    if (!res.ok) throw new Error(`No se pudo leer ${path} (${res.status})`);
+    const data = await res.json();
+    return { data: fromBase64Json(data.content), sha: data.sha };
+  }
+
+  // Escribe cualquier archivo JSON en el repo (crea o actualiza según haya sha)
+  async function writeJsonFile(path, obj, sha, message) {
+    const body = { message: message || `Actualiza ${path}`, content: toBase64Json(obj) };
+    if (sha) body.sha = sha;
+    const res = await apiRequest(path, { method: "PUT", body: JSON.stringify(body) });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(`No se pudo guardar ${path}: ${err.message || res.status}`);
+    }
+    return res.json();
+  }
+
   // Lee el index.json. Si no existe todavía, devuelve una estructura vacía.
   async function readIndex() {
     const res = await apiRequest("data/index.json");
@@ -102,6 +130,33 @@ const GitHubStorage = (() => {
     };
   }
 
+  // Sube texto generado (p. ej. un resumen de Claude) como archivo, sin pasar por un File real
+  async function uploadTextFile(oposicion, temaId, categoria, filename, textContent) {
+    const base64 = btoa(unescape(encodeURIComponent(textContent)));
+    const safeName = `${Date.now()}-${filename.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    const path = `files/${oposicion}/${temaId}/${categoria}/${safeName}`;
+    const res = await apiRequest(path, {
+      method: "PUT",
+      body: JSON.stringify({
+        message: `Genera ${filename} en ${temaId}/${categoria}`,
+        content: base64,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(`No se pudo guardar ${filename}: ${err.message || res.status}`);
+    }
+    const data = await res.json();
+    return {
+      nombre: filename,
+      path,
+      sha: data.content.sha,
+      url: data.content.download_url,
+      tipo: "text/markdown",
+      subidoEl: new Date().toISOString(),
+    };
+  }
+
   // Borra un archivo del repo
   async function deleteFile(path, sha) {
     const res = await apiRequest(path, {
@@ -142,7 +197,10 @@ const GitHubStorage = (() => {
     isReady,
     readIndex,
     writeIndex,
+    readJsonFile,
+    writeJsonFile,
     uploadFile,
+    uploadTextFile,
     deleteFile,
     fetchFileRaw,
     testConnection,
