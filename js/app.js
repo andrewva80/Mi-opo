@@ -357,6 +357,16 @@ function renderFileList(categoria) {
 
 // ---------- Crear / borrar temas ----------
 
+function selectStyle() {
+  return "width:100%;padding:10px;border-radius:6px;background:var(--ink-soft);color:var(--paper);border:1px solid var(--line-strong);";
+}
+
+function opcionesTipo(bloque) {
+  return tiposParaBloque(bloque)
+    .map((t) => `<option value="${t}">${TIPOS_TEMA[t].emoji} ${TIPOS_TEMA[t].label}</option>`)
+    .join("");
+}
+
 function carpetasExistentes(bloque) {
   const set = new Set();
   todosTemasBloque(bloque).forEach((t) => { if (t.carpeta) set.add(t.carpeta); });
