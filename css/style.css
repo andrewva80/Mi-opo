@@ -272,7 +272,13 @@ input:focus, textarea:focus, button:focus-visible {
   position: sticky;
   top: 78px;
 }
-.ai-panel-header h3 { font-size: 0.95rem; margin-bottom: 10px; }
+.ai-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.ai-panel-header h3 { font-size: 0.95rem; }
 .avisos { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
 .aviso {
   background: rgba(224,164,88,0.1);
