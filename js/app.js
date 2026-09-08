@@ -32,6 +32,7 @@ let estado = {
   temaActivoId: null,
   categoriaActiva: "esquemas",
   historialChat: [],
+  chatSha: null,
   carpetasCerradas: new Set(), // guarda "bloque::nombreCarpeta"
 };
 
@@ -183,11 +184,14 @@ function cablearEventosApp() {
   document.getElementById("btn-marcar-repasado").addEventListener("click", marcarRepasadoHoy);
   document.getElementById("btn-borrar-tema").addEventListener("click", borrarTemaActivo);
   document.getElementById("btn-generar-examen").addEventListener("click", generarExamen);
+  document.getElementById("btn-generar-resumen").addEventListener("click", generarResumenTema);
 
   document.getElementById("chat-form").addEventListener("submit", (e) => {
     e.preventDefault();
     enviarMensajeChat();
   });
+
+  document.getElementById("btn-vaciar-chat").addEventListener("click", vaciarHistorialChat);
 }
 
 // ---------- Sidebar / temas ----------
@@ -309,11 +313,57 @@ function buscarTema(id) {
 function abrirTema(id, bloque) {
   estado.temaActivoId = id;
   estado.categoriaActiva = "esquemas";
-  estado.historialChat = [];
-  document.getElementById("chat-log").innerHTML =
-    '<div class="chat-msg chat-assistant">Pregúntame sobre este tema: puedo revisar tus fallos, explicarte algo del esquema, o hacerte un examen corto.</div>';
   renderSidebar();
   mostrarTemaView();
+  cargarHistorialChat(id, bloque);
+}
+
+async function cargarHistorialChat(temaId, bloque) {
+  const log = document.getElementById("chat-log");
+  log.innerHTML = '<div class="chat-msg chat-assistant">Cargando conversación anterior...</div>';
+  const mensajeInicial = "Pregúntame sobre este tema: puedo revisar tus fallos, explicarte algo del esquema, o hacerte un examen corto.";
+  try {
+    const { data, sha } = await GitHubStorage.readJsonFile(`data/chat/${bloque}/${temaId}.json`);
+    if (estado.temaActivoId !== temaId) return; // el usuario ya cambió de tema mientras cargaba
+    estado.chatSha = sha;
+    estado.historialChat = (data && data.historial) || [];
+    log.innerHTML = "";
+    if (estado.historialChat.length === 0) {
+      agregarMensajeChat("assistant", mensajeInicial);
+    } else {
+      estado.historialChat.forEach((m) => agregarMensajeChat(m.role === "user" ? "user" : "assistant", m.content));
+    }
+  } catch (e) {
+    console.error(e);
+    estado.historialChat = [];
+    estado.chatSha = null;
+    log.innerHTML = `<div class="chat-msg chat-assistant">${mensajeInicial}</div>`;
+  }
+}
+
+async function guardarHistorialChat() {
+  const { bloque } = buscarTema(estado.temaActivoId) || {};
+  if (!bloque) return;
+  try {
+    const res = await GitHubStorage.writeJsonFile(
+      `data/chat/${bloque}/${estado.temaActivoId}.json`,
+      { historial: estado.historialChat },
+      estado.chatSha,
+      "Actualiza historial de chat"
+    );
+    estado.chatSha = res.content.sha;
+  } catch (e) {
+    console.warn("No se pudo guardar el historial de chat:", e);
+  }
+}
+
+async function vaciarHistorialChat() {
+  if (!estado.temaActivoId) return;
+  if (!confirm("¿Vaciar el historial de este chat? No se puede deshacer.")) return;
+  estado.historialChat = [];
+  await guardarHistorialChat();
+  document.getElementById("chat-log").innerHTML =
+    '<div class="chat-msg chat-assistant">Historial vaciado. Pregúntame lo que necesites sobre este tema.</div>';
 }
 
 function mostrarVacio() {
@@ -606,6 +656,57 @@ async function generarExamen() {
   }
 }
 
+async function generarResumenTema() {
+  if (!ClaudeAI.isReady()) { alert("Falta la API key de Anthropic en la configuración."); return; }
+  const { tema, bloque } = buscarTema(estado.temaActivoId);
+  const btn = document.getElementById("btn-generar-resumen");
+  const textoOriginalBtn = btn.textContent;
+  btn.textContent = "Generando resumen...";
+  btn.disabled = true;
+  try {
+    const esquemas = await descargarArchivosParaIA(tema.archivos.esquemas);
+    const ejercicios = await descargarArchivosParaIA(tema.archivos.ejercicios, 2);
+    if (esquemas.length === 0 && ejercicios.length === 0) {
+      alert("Sube al menos un esquema o ejercicio a este tema para poder generar el resumen.");
+      return;
+    }
+    const texto = await ClaudeAI.generarResumen(tema.nombre, esquemas, ejercicios);
+    abrirModal(`
+      <h2 style="margin-bottom:14px;">Resumen — ${escapeHtml(tema.nombre)}</h2>
+      <div style="white-space:pre-wrap; font-size:0.9rem; line-height:1.6; max-height:50vh; overflow-y:auto; margin-bottom:16px; background:var(--ink); border-radius:6px; padding:12px;">${escapeHtml(texto)}</div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn btn-primary" id="guardar-resumen">Guardar como archivo en Esquemas</button>
+        <button class="btn btn-ghost" id="cerrar-resumen">Cerrar sin guardar</button>
+      </div>
+    `);
+    document.getElementById("cerrar-resumen").addEventListener("click", cerrarModal);
+    document.getElementById("guardar-resumen").addEventListener("click", async (e) => {
+      const btnGuardar = e.currentTarget;
+      btnGuardar.textContent = "Guardando...";
+      btnGuardar.disabled = true;
+      try {
+        const nombreArchivo = `Resumen - ${tema.nombre}.md`;
+        const meta = await GitHubStorage.uploadTextFile(bloque, tema.id, "esquemas", nombreArchivo, texto);
+        tema.archivos.esquemas.push(meta);
+        setSyncStatus("guardando...");
+        await guardarIndice(`Añade resumen generado a "${tema.nombre}"`);
+        setSyncStatus("sincronizado");
+        cerrarModal();
+        if (estado.categoriaActiva === "esquemas") renderFileList("esquemas");
+      } catch (err) {
+        alert(err.message);
+        btnGuardar.textContent = "Guardar como archivo en Esquemas";
+        btnGuardar.disabled = false;
+      }
+    });
+  } catch (e) {
+    alert(e.message);
+  } finally {
+    btn.textContent = textoOriginalBtn;
+    btn.disabled = false;
+  }
+}
+
 // ---------- Chat ----------
 
 async function enviarMensajeChat() {
@@ -627,6 +728,7 @@ async function enviarMensajeChat() {
     pensando.textContent = respuesta;
     estado.historialChat.push({ role: "user", content: pregunta });
     estado.historialChat.push({ role: "assistant", content: respuesta });
+    await guardarHistorialChat();
   } catch (e) {
     pensando.textContent = "Error: " + e.message;
   }
