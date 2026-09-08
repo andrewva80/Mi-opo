@@ -106,5 +106,17 @@ y dame 3-5 puntos concretos en los que debería repasar antes del examen.`;
     return callClaude(messages, SYSTEM_BASE);
   }
 
-  return { init, isReady, chatSobreTema, generarExamenRepaso, revisarErrores };
+  async function generarResumen(temaNombre, archivosEsquemas, archivosEjercicios) {
+    const blocks = [...filesToBlocks(archivosEsquemas), ...filesToBlocks(archivosEjercicios)];
+    const instruccion = `Basándote en el material adjunto del tema "${temaNombre}", genera un resumen/esquema mental
+claro y bien organizado en formato Markdown (títulos con #, subtítulos, listas, **negrita** en los conceptos clave).
+Debe servir como material de repaso rápido antes del examen: prioriza estructura y jerarquía de ideas sobre prosa larga.
+No añadas comentarios fuera del propio resumen (nada de "aquí tienes tu resumen"), empieza directamente con el título.`;
+    const messages = [
+      { role: "user", content: [...blocks, { type: "text", text: instruccion }] },
+    ];
+    return callClaude(messages, SYSTEM_BASE);
+  }
+
+  return { init, isReady, chatSobreTema, generarExamenRepaso, generarResumen, revisarErrores };
 })();
