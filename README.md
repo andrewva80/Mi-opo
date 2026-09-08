@@ -14,6 +14,9 @@ repositorio de GitHub**, usando la API de Contents:
 
 - `data/index.json` → la lista de temas, en qué bloque están y cuándo los
   repasaste por última vez.
+- `data/chat/<comun|alicante|valencia>/<temaId>.json` → el historial de la
+  conversación con Claude en cada tema, para que se acuerde de lo hablado
+  aunque cierres la app o cambies de dispositivo.
 - `files/<comun|alicante|valencia>/<temaId>/<esquemas|ejercicios|examenes>/...`
   → los archivos que subas (fotos, PDF, documentos).
 
