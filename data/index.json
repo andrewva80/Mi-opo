@@ -19,6 +19,18 @@
         "ejercicios": [],
         "examenes": []
       }
+    },
+    {
+      "id": "t_mtshpy4y",
+      "nombre": "Ley 31/95 LPRL",
+      "tipo": "legislacion",
+      "carpeta": "Leyes",
+      "ultimaRevision": null,
+      "archivos": {
+        "esquemas": [],
+        "ejercicios": [],
+        "examenes": []
+      }
     }
   ],
   "alicante": [],
