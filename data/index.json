@@ -52,7 +52,16 @@
       "carpeta": "IVASPE",
       "ultimaRevision": null,
       "archivos": {
-        "esquemas": [],
+        "esquemas": [
+          {
+            "nombre": "Tema 9 Riesgo en accidentes con materias peligrosas.pdf",
+            "path": "files/comun/t_mttxuumz/esquemas/1788948710104-Tema_9_Riesgo_en_accidentes_con_materias_peligrosas.pdf",
+            "sha": "38e93f5a70989a650e6574592aa7590346177471",
+            "url": "https://raw.githubusercontent.com/andrewva80/Mi-opo/main/files/comun/t_mttxuumz/esquemas/1788948710104-Tema_9_Riesgo_en_accidentes_con_materias_peligrosas.pdf",
+            "tipo": "application/pdf",
+            "subidoEl": "2026-09-09T10:11:54.207Z"
+          }
+        ],
         "ejercicios": [],
         "examenes": []
       }
