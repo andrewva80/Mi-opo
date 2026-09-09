@@ -18,22 +18,35 @@ const ClaudeAI = (() => {
     return !!apiKey;
   }
 
-  async function callClaude(messages, system) {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 2000,
-        system,
-        messages,
-      }),
-    });
+  async function callClaude(messages, system, intentosRestantes = 2) {
+    let res;
+    try {
+      res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          max_tokens: 2000,
+          system,
+          messages,
+        }),
+      });
+    } catch (e) {
+      // Fallo de red real (conexión cortada, "Load failed"...), no un error de la API.
+      // Con archivos grandes de por medio, un reintento suele bastar.
+      if (intentosRestantes > 1) {
+        await new Promise((r) => setTimeout(r, 1200));
+        return callClaude(messages, system, intentosRestantes - 1);
+      }
+      throw new Error(
+        "Fallo de conexión al mandar los archivos a Claude. Si el tema tiene varios PDFs grandes, prueba a preguntar con menos material a la vez, o revisa tu wifi."
+      );
+    }
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.error?.message || `Error de la API de Claude (${res.status})`);
