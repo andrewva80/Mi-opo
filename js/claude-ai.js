@@ -8,7 +8,7 @@
 
 const ClaudeAI = (() => {
   let apiKey = null;
-  const MODEL = "claude-sonnet-4-6";
+  const MODEL = "claude-sonnet-5";
 
   function init(key) {
     apiKey = key;
