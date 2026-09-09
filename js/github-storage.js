@@ -166,12 +166,25 @@ const GitHubStorage = (() => {
     if (!res.ok) throw new Error(`No se pudo borrar el archivo (${res.status})`);
   }
 
-  // Descarga el contenido bruto de un archivo (para mandarlo a Claude)
+  // Descarga el contenido bruto de un archivo (para mandarlo a Claude).
+  // Usamos el modo "raw" en vez del JSON con base64 embebido, porque ese JSON
+  // tiene un límite de ~1MB; el modo raw no tiene ese límite.
   async function fetchFileRaw(path) {
-    const res = await apiRequest(path);
+    const res = await apiRequest(path, { headers: { Accept: "application/vnd.github.raw" } });
     if (!res.ok) throw new Error(`No se pudo leer ${path}`);
-    const data = await res.json();
-    return { base64: data.content.replace(/\n/g, ""), mediaType: guessMediaType(data.name) };
+    const buffer = await res.arrayBuffer();
+    const filename = path.split("/").pop();
+    return { base64: arrayBufferToBase64(buffer), mediaType: guessMediaType(filename) };
+  }
+
+  function arrayBufferToBase64(buffer) {
+    let binary = "";
+    const bytes = new Uint8Array(buffer);
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+    }
+    return btoa(binary);
   }
 
   function guessMediaType(filename) {
