@@ -33,6 +33,7 @@ let estado = {
   categoriaActiva: "esquemas",
   historialChat: [],
   chatSha: null,
+  filtroTemas: "",
   carpetasCerradas: new Set(), // guarda "bloque::nombreCarpeta"
 };
 
@@ -163,6 +164,11 @@ function cablearEventosApp() {
 
   document.getElementById("add-tema").addEventListener("click", abrirModalNuevoTema);
 
+  document.getElementById("buscador-temas").addEventListener("input", (e) => {
+    estado.filtroTemas = e.target.value.trim().toLowerCase();
+    renderSidebar();
+  });
+
   document.querySelectorAll(".tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => cambiarTab(btn.dataset.tab));
   });
@@ -206,6 +212,8 @@ function renderSidebar() {
   const listaEspecifico = document.getElementById("lista-especifico");
   renderListaBloque(listaComun, "comun");
   renderListaBloque(listaEspecifico, estado.oposicionActiva);
+  listaComun.closest(".block-group").classList.toggle("hidden", listaComun.children.length === 0);
+  listaEspecifico.closest(".block-group").classList.toggle("hidden", listaEspecifico.children.length === 0);
 }
 
 // Agrupa los temas de un bloque por carpeta (los que no tienen carpeta van sueltos arriba)
@@ -222,6 +230,15 @@ function agruparPorCarpeta(temas) {
 function renderListaBloque(ul, bloque) {
   ul.innerHTML = "";
   const temas = todosTemasBloque(bloque);
+  const filtro = estado.filtroTemas;
+
+  if (filtro) {
+    const coincidencias = temas.filter((t) => t.nombre.toLowerCase().includes(filtro));
+    if (coincidencias.length === 0) return; // no muestra nada de este bloque si no hay resultados
+    coincidencias.forEach((tema) => ul.appendChild(renderTemaItem(tema, bloque)));
+    return;
+  }
+
   const grupos = agruparPorCarpeta(temas);
 
   // primero los temas sin carpeta
