@@ -43,6 +43,18 @@
         "ejercicios": [],
         "examenes": []
       }
+    },
+    {
+      "id": "t_mttxuumz",
+      "nombre": "Tema 9 - Riesgos en accidentes con materias peligrosas",
+      "tipo": "ivaspe",
+      "carpeta": "IVASPE",
+      "ultimaRevision": null,
+      "archivos": {
+        "esquemas": [],
+        "ejercicios": [],
+        "examenes": []
+      }
     }
   ],
   "alicante": [],
