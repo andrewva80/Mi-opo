@@ -516,10 +516,20 @@ function abrirModalNuevoTema() {
 function abrirModalEditarTema(temaId, bloque) {
   const tema = todosTemasBloque(bloque).find((t) => t.id === temaId);
   if (!tema) return;
+  const bloquesDisponibles = [
+    { value: "comun", label: "Común (IVASPE / Legislación)" },
+    { value: "alicante", label: "Alicante (geografía / procedimientos)" },
+    { value: "valencia", label: "Valencia (geografía / procedimientos)" },
+  ];
   abrirModal(`
     <h2 style="margin-bottom:14px;">Editar tema</h2>
     <label class="field"><span>Nombre del tema</span>
       <input type="text" id="editar-tema-nombre" value="${escapeHtml(tema.nombre)}">
+    </label>
+    <label class="field"><span>Bloque</span>
+      <select id="editar-tema-bloque" style="${selectStyle()}">
+        ${bloquesDisponibles.map((b) => `<option value="${b.value}">${b.label}</option>`).join("")}
+      </select>
     </label>
     <label class="field"><span>Tipo (para el icono)</span>
       <select id="editar-tema-tipo" style="${selectStyle()}">
@@ -530,19 +540,41 @@ function abrirModalEditarTema(temaId, bloque) {
       <input type="text" id="editar-tema-carpeta" list="lista-carpetas-editar" value="${escapeHtml(tema.carpeta || "")}" placeholder="p. ej. Leyes">
       ${datalistCarpetas(bloque, "lista-carpetas-editar")}
     </label>
+    <p id="aviso-cambio-bloque" class="hidden" style="color:var(--amber); font-size:0.78rem; margin-top:-4px; margin-bottom:14px;">
+      Si cambias de bloque, los archivos ya subidos se quedan donde están (siguen funcionando), pero el tema
+      pasará a aparecer bajo el otro bloque en el lateral.
+    </p>
     <div style="display:flex; gap:10px; margin-top:16px;">
       <button class="btn btn-primary" id="confirmar-editar-tema">Guardar cambios</button>
       <button class="btn btn-ghost" id="cancelar-editar-tema">Cancelar</button>
     </div>
   `);
-  document.getElementById("editar-tema-tipo").value = tema.tipo || tiposParaBloque(bloque)[0];
+  const selectBloque = document.getElementById("editar-tema-bloque");
+  const selectTipo = document.getElementById("editar-tema-tipo");
+  selectBloque.value = bloque;
+  selectTipo.value = tema.tipo || tiposParaBloque(bloque)[0];
+
+  selectBloque.addEventListener("change", () => {
+    selectTipo.innerHTML = opcionesTipo(selectBloque.value);
+    document.getElementById("lista-carpetas-editar").outerHTML = datalistCarpetas(selectBloque.value, "lista-carpetas-editar");
+    document.getElementById("aviso-cambio-bloque").classList.toggle("hidden", selectBloque.value === bloque);
+  });
+
   document.getElementById("cancelar-editar-tema").addEventListener("click", cerrarModal);
   document.getElementById("confirmar-editar-tema").addEventListener("click", async () => {
     const nombre = val("editar-tema-nombre");
     if (!nombre) return;
+    const nuevoBloque = selectBloque.value;
     tema.nombre = nombre;
     tema.tipo = document.getElementById("editar-tema-tipo").value;
     tema.carpeta = document.getElementById("editar-tema-carpeta").value.trim() || null;
+
+    if (nuevoBloque !== bloque) {
+      estado.temario[bloque] = estado.temario[bloque].filter((t) => t.id !== tema.id);
+      estado.temario[nuevoBloque] = estado.temario[nuevoBloque] || [];
+      estado.temario[nuevoBloque].push(tema);
+    }
+
     cerrarModal();
     setSyncStatus("guardando...");
     await guardarIndice(`Edita tema "${nombre}"`);
