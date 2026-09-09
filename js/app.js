@@ -675,6 +675,10 @@ async function descargarArchivosParaIA(archivos, limite = 4) {
   for (const f of seleccion) {
     try {
       const { base64, mediaType } = await GitHubStorage.fetchFileRaw(f.path);
+      if (!base64) {
+        console.warn(`${f.nombre} llegó vacío, se descarta`);
+        continue;
+      }
       resultados.push({ nombre: f.nombre, base64, mediaType });
     } catch (e) {
       console.warn("No se pudo descargar", f.path, e);
