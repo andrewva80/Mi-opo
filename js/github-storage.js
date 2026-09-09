@@ -126,6 +126,7 @@ const GitHubStorage = (() => {
       sha: data.content.sha,
       url: data.content.download_url,
       tipo: file.type,
+      tamano: file.size,
       subidoEl: new Date().toISOString(),
     };
   }
@@ -152,6 +153,7 @@ const GitHubStorage = (() => {
       path,
       sha: data.content.sha,
       url: data.content.download_url,
+      tamano: data.content.size,
       tipo: "text/markdown",
       subidoEl: new Date().toISOString(),
     };
