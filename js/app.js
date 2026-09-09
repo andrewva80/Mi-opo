@@ -155,6 +155,7 @@ function cablearEventosApp() {
     });
   });
 
+  document.getElementById("open-comparar").addEventListener("click", abrirModalComparar);
   document.getElementById("open-progreso").addEventListener("click", abrirModalProgreso);
 
   document.getElementById("open-settings").addEventListener("click", () => {
@@ -855,6 +856,87 @@ function abrirModalProgreso() {
     <button class="btn btn-ghost" id="cerrar-progreso" style="margin-top:20px;">Cerrar</button>
   `);
   document.getElementById("cerrar-progreso").addEventListener("click", cerrarModal);
+}
+
+function opcionesTemasParaSelect() {
+  const bloques = [
+    { key: "comun", label: "Común" },
+    { key: "alicante", label: "Alicante" },
+    { key: "valencia", label: "Valencia" },
+  ];
+  return bloques
+    .map((b) => {
+      const temas = todosTemasBloque(b.key);
+      if (temas.length === 0) return "";
+      const opciones = temas
+        .map((t) => `<option value="${b.key}::${t.id}">${emojiTema(t)} ${escapeHtml(t.nombre)}</option>`)
+        .join("");
+      return `<optgroup label="${b.label}">${opciones}</optgroup>`;
+    })
+    .join("");
+}
+
+function abrirModalComparar() {
+  const opciones = opcionesTemasParaSelect();
+  if (!opciones) {
+    alert("Crea al menos dos temas antes de poder compararlos.");
+    return;
+  }
+  abrirModal(`
+    <h2 style="margin-bottom:14px;">🆚 Comparar dos temas</h2>
+    <p style="color:rgba(241,237,228,0.55); font-size:0.82rem; margin-bottom:16px;">
+      Útil cuando dos temas comparten tablas o datos parecidos (plazos, cifras...) y quieres ver
+      claramente qué es igual y qué cambia entre ambos.
+    </p>
+    <label class="field"><span>Primer tema</span>
+      <select id="comparar-tema-a" style="${selectStyle()}">${opciones}</select>
+    </label>
+    <label class="field"><span>Segundo tema</span>
+      <select id="comparar-tema-b" style="${selectStyle()}">${opciones}</select>
+    </label>
+    <div style="display:flex; gap:10px; margin-top:16px;">
+      <button class="btn btn-primary" id="confirmar-comparar">Comparar</button>
+      <button class="btn btn-ghost" id="cancelar-comparar">Cancelar</button>
+    </div>
+  `);
+  document.getElementById("cancelar-comparar").addEventListener("click", cerrarModal);
+  document.getElementById("confirmar-comparar").addEventListener("click", ejecutarComparacion);
+}
+
+async function ejecutarComparacion() {
+  if (!ClaudeAI.isReady()) { alert("Falta la API key de Anthropic en la configuración."); return; }
+  const valA = document.getElementById("comparar-tema-a").value;
+  const valB = document.getElementById("comparar-tema-b").value;
+  if (valA === valB) { alert("Elige dos temas distintos."); return; }
+
+  const [bloqueA, idA] = valA.split("::");
+  const [bloqueB, idB] = valB.split("::");
+  const temaA = todosTemasBloque(bloqueA).find((t) => t.id === idA);
+  const temaB = todosTemasBloque(bloqueB).find((t) => t.id === idB);
+
+  const btn = document.getElementById("confirmar-comparar");
+  const textoOriginal = btn.textContent;
+  btn.textContent = "Comparando...";
+  btn.disabled = true;
+  try {
+    const archivosA = await descargarArchivosParaIA([...temaA.archivos.esquemas, ...temaA.archivos.ejercicios], 3);
+    const archivosB = await descargarArchivosParaIA([...temaB.archivos.esquemas, ...temaB.archivos.ejercicios], 3);
+    if (archivosA.length === 0 || archivosB.length === 0) {
+      alert("Ambos temas necesitan al menos un archivo subido (esquema o ejercicio) para poder compararlos.");
+      return;
+    }
+    const texto = await ClaudeAI.compararTemas(temaA.nombre, archivosA, temaB.nombre, archivosB);
+    abrirModal(`
+      <h2 style="margin-bottom:14px;">🆚 ${escapeHtml(temaA.nombre)} — vs — ${escapeHtml(temaB.nombre)}</h2>
+      <div style="white-space:pre-wrap; font-size:0.9rem; line-height:1.6; max-height:55vh; overflow-y:auto; background:var(--ink); border-radius:6px; padding:12px; margin-bottom:16px;">${escapeHtml(texto)}</div>
+      <button class="btn btn-ghost" id="cerrar-comparacion">Cerrar</button>
+    `);
+    document.getElementById("cerrar-comparacion").addEventListener("click", cerrarModal);
+  } catch (e) {
+    alert(e.message);
+    btn.textContent = textoOriginal;
+    btn.disabled = false;
+  }
 }
 
 // ---------- Chat ----------
