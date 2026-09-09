@@ -155,6 +155,8 @@ function cablearEventosApp() {
     });
   });
 
+  document.getElementById("open-progreso").addEventListener("click", abrirModalProgreso);
+
   document.getElementById("open-settings").addEventListener("click", () => {
     if (confirm("¿Borrar la configuración guardada en este dispositivo y volver a introducirla?")) {
       localStorage.removeItem("parteEstudio.config");
@@ -753,6 +755,106 @@ async function revisarErroresTema() {
     btn.textContent = textoOriginalBtn;
     btn.disabled = false;
   }
+}
+
+function contarArchivos(tema) {
+  return (
+    (tema.archivos.esquemas?.length || 0) +
+    (tema.archivos.ejercicios?.length || 0) +
+    (tema.archivos.examenes?.length || 0)
+  );
+}
+
+function abrirModalProgreso() {
+  const bloques = ["comun", "alicante", "valencia"];
+  const nombreBloque = {
+    comun: "Común (IVASPE / Legislación)",
+    alicante: "Alicante (geografía / procedimientos)",
+    valencia: "Valencia (geografía / procedimientos)",
+  };
+  const pct = (n, total) => (total === 0 ? 0 : Math.round((n / total) * 100));
+
+  let totalTemas = 0, totalRepasados = 0, totalPendientes = 0, totalArchivos = 0;
+  const statsPorBloque = {};
+  const atrasados = [];
+
+  bloques.forEach((bloque) => {
+    const temas = todosTemasBloque(bloque);
+    let repasados = 0, pendientes = 0, archivos = 0;
+    temas.forEach((tema) => {
+      const dias = diasDesde(tema.ultimaRevision);
+      if (tema.ultimaRevision) repasados++;
+      if (dias >= DIAS_AVISO) {
+        pendientes++;
+        atrasados.push({ tema, dias, bloque });
+      }
+      archivos += contarArchivos(tema);
+    });
+    statsPorBloque[bloque] = { total: temas.length, repasados, pendientes, archivos };
+    totalTemas += temas.length;
+    totalRepasados += repasados;
+    totalPendientes += pendientes;
+    totalArchivos += archivos;
+  });
+
+  atrasados.sort((a, b) => b.dias - a.dias);
+
+  const celda = (contenido, alinear = "left") =>
+    `<td style="padding:7px 10px 7px 0; border-bottom:1px solid var(--line); text-align:${alinear};">${contenido}</td>`;
+
+  const filasBloque = bloques
+    .filter((b) => statsPorBloque[b].total > 0)
+    .map((b) => {
+      const s = statsPorBloque[b];
+      return `<tr>
+        ${celda(nombreBloque[b])}
+        ${celda(s.total, "center")}
+        ${celda(pct(s.repasados, s.total) + "%", "center")}
+        ${celda(s.pendientes, "center")}
+        ${celda(s.archivos, "center")}
+      </tr>`;
+    })
+    .join("");
+
+  const listaAtrasados =
+    atrasados.length === 0
+      ? '<p style="color:rgba(241,237,228,0.5); font-size:0.85rem;">Nada atrasado, vas al día 🎉</p>'
+      : `<ul style="list-style:none; padding:0; margin:0; max-height:220px; overflow-y:auto;">
+          ${atrasados
+            .map(
+              (a) => `<li style="display:flex; justify-content:space-between; gap:10px; font-size:0.85rem; padding:7px 0; border-bottom:1px solid var(--line);">
+                <span>${emojiTema(a.tema)} ${escapeHtml(a.tema.nombre)}</span>
+                <span style="flex-shrink:0; color:${a.dias >= DIAS_URGENTE ? "#d98071" : "var(--amber)"};">${a.dias === Infinity ? "nunca repasado" : a.dias + " días"}</span>
+              </li>`
+            )
+            .join("")}
+        </ul>`;
+
+  abrirModal(`
+    <h2 style="margin-bottom:6px;">📊 Progreso general</h2>
+    <p style="color:rgba(241,237,228,0.55); font-size:0.8rem; margin-bottom:18px;">
+      ${totalTemas} temas en total · ${pct(totalRepasados, totalTemas)}% repasados alguna vez · ${totalPendientes} pendientes · ${totalArchivos} archivos subidos
+    </p>
+
+    <table style="width:100%; border-collapse:collapse; font-size:0.85rem; margin-bottom:24px;">
+      <thead>
+        <tr style="text-align:left; color:rgba(241,237,228,0.5); font-size:0.72rem;">
+          <th style="padding-bottom:8px; font-weight:500;">Bloque</th>
+          <th style="padding-bottom:8px; font-weight:500; text-align:center;">Temas</th>
+          <th style="padding-bottom:8px; font-weight:500; text-align:center;">% repasado</th>
+          <th style="padding-bottom:8px; font-weight:500; text-align:center;">Atrasados</th>
+          <th style="padding-bottom:8px; font-weight:500; text-align:center;">Archivos</th>
+        </tr>
+      </thead>
+      <tbody>${filasBloque || `<tr>${celda("Todavía no hay temas creados.")}</tr>`}</tbody>
+    </table>
+
+    <h3 style="font-size:0.95rem; margin-bottom:10px;">Más atrasados</h3>
+    ${listaAtrasados}
+
+    <button class="btn btn-ghost" id="cerrar-progreso" style="margin-top:20px;">Cerrar</button>
+  `);
+  document.getElementById("cerrar-progreso").addEventListener("click", cerrarModal);
 }
 
 // ---------- Chat ----------
