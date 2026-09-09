@@ -308,6 +308,16 @@ input:focus, textarea:focus, button:focus-visible {
 .chat-user { background: var(--steel); color: var(--paper); align-self: flex-end; }
 .chat-form { display: flex; gap: 8px; }
 .chat-form textarea { flex: 1; resize: none; }
+.chat-archivos-selector { margin-bottom: 10px; display: flex; flex-direction: column; gap: 5px; }
+.chat-archivos-titulo { font-size: 0.72rem; color: rgba(241,237,228,0.45); margin: 0 0 3px; }
+.chat-archivo-check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.78rem;
+  color: rgba(241,237,228,0.75);
+}
+.chat-archivo-check input { accent-color: var(--ember); }
 
 /* ---------- Modal ---------- */
 .modal-overlay {
