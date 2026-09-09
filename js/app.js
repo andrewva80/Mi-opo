@@ -185,6 +185,7 @@ function cablearEventosApp() {
   document.getElementById("btn-borrar-tema").addEventListener("click", borrarTemaActivo);
   document.getElementById("btn-generar-examen").addEventListener("click", generarExamen);
   document.getElementById("btn-generar-resumen").addEventListener("click", generarResumenTema);
+  document.getElementById("btn-revisar-errores").addEventListener("click", revisarErroresTema);
 
   document.getElementById("chat-form").addEventListener("submit", (e) => {
     e.preventDefault();
@@ -699,6 +700,36 @@ async function generarResumenTema() {
         btnGuardar.disabled = false;
       }
     });
+  } catch (e) {
+    alert(e.message);
+  } finally {
+    btn.textContent = textoOriginalBtn;
+    btn.disabled = false;
+  }
+}
+
+async function revisarErroresTema() {
+  if (!ClaudeAI.isReady()) { alert("Falta la API key de Anthropic en la configuración."); return; }
+  const { tema } = buscarTema(estado.temaActivoId);
+  const btn = document.getElementById("btn-revisar-errores");
+  const textoOriginalBtn = btn.textContent;
+  btn.textContent = "Revisando...";
+  btn.disabled = true;
+  try {
+    const ejercicios = await descargarArchivosParaIA(tema.archivos.ejercicios, 6);
+    const examenes = await descargarArchivosParaIA(tema.archivos.examenes, 3);
+    const material = [...ejercicios, ...examenes];
+    if (material.length === 0) {
+      alert("Sube al menos un ejercicio o examen ya corregido a este tema para poder revisar tus errores.");
+      return;
+    }
+    const texto = await ClaudeAI.revisarErrores(tema.nombre, material);
+    abrirModal(`
+      <h2 style="margin-bottom:14px;">En qué sueles fallar — ${escapeHtml(tema.nombre)}</h2>
+      <div style="white-space:pre-wrap; font-size:0.9rem; line-height:1.6; max-height:50vh; overflow-y:auto; margin-bottom:16px; background:var(--ink); border-radius:6px; padding:12px;">${escapeHtml(texto)}</div>
+      <button class="btn btn-ghost" id="cerrar-errores">Cerrar</button>
+    `);
+    document.getElementById("cerrar-errores").addEventListener("click", cerrarModal);
   } catch (e) {
     alert(e.message);
   } finally {
