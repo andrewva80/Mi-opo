@@ -118,5 +118,21 @@ No añadas comentarios fuera del propio resumen (nada de "aquí tienes tu resume
     return callClaude(messages, SYSTEM_BASE);
   }
 
-  return { init, isReady, chatSobreTema, generarExamenRepaso, generarResumen, revisarErrores };
+  async function compararTemas(nombreA, archivosA, nombreB, archivosB) {
+    const bloques = [
+      { type: "text", text: `--- Material del tema "${nombreA}" ---` },
+      ...filesToBlocks(archivosA),
+      { type: "text", text: `--- Material del tema "${nombreB}" ---` },
+      ...filesToBlocks(archivosB),
+    ];
+    const instruccion = `Compara el material de estos dos temas de oposición. En formato de lista, señala:
+1. Qué conceptos, tablas o datos son prácticamente iguales entre ambos (para no estudiarlos dos veces por separado).
+2. Qué diferencias clave hay (cifras, plazos, nombres, procedimientos) que se puedan confundir fácilmente en el examen.
+3. Un aviso final con los 2-3 puntos donde más riesgo hay de mezclar datos de un tema con el otro.
+Sé conciso y ve al grano.`;
+    const messages = [{ role: "user", content: [...bloques, { type: "text", text: instruccion }] }];
+    return callClaude(messages, SYSTEM_BASE);
+  }
+
+  return { init, isReady, chatSobreTema, generarExamenRepaso, generarResumen, revisarErrores, compararTemas };
 })();
