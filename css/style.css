@@ -133,6 +133,12 @@ input:focus, textarea:focus, button:focus-visible {
   border-right: 1px solid var(--line);
   padding: 18px 14px;
 }
+.buscador {
+  width: 100%;
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+  padding: 8px 10px;
+}
 .block-group { margin-bottom: 22px; }
 .block-label {
   font-family: var(--font-display);
