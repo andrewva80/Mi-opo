@@ -34,6 +34,7 @@ let estado = {
   historialChat: [],
   chatSha: null,
   filtroTemas: "",
+  chatArchivosDesmarcados: new Set(), // paths que el usuario ha desmarcado para el chat
   carpetasCerradas: new Set(), // guarda "bloque::nombreCarpeta"
 };
 
@@ -334,9 +335,37 @@ function buscarTema(id) {
 function abrirTema(id, bloque) {
   estado.temaActivoId = id;
   estado.categoriaActiva = "esquemas";
+  estado.chatArchivosDesmarcados = new Set();
   renderSidebar();
   mostrarTemaView();
+  renderSelectorArchivosChat();
   cargarHistorialChat(id, bloque);
+}
+
+function renderSelectorArchivosChat() {
+  const { tema } = buscarTema(estado.temaActivoId) || {};
+  const cont = document.getElementById("chat-archivos-selector");
+  if (!tema) { cont.innerHTML = ""; return; }
+  const todos = [
+    ...tema.archivos.esquemas.map((f) => ({ ...f, categoria: "esquemas" })),
+    ...tema.archivos.ejercicios.map((f) => ({ ...f, categoria: "ejercicios" })),
+  ];
+  if (todos.length === 0) { cont.innerHTML = ""; return; }
+  cont.innerHTML = `<p class="chat-archivos-titulo">Archivos que le mando al preguntar:</p>` +
+    todos.map((f) => {
+      const marcado = !estado.chatArchivosDesmarcados.has(f.path);
+      return `<label class="chat-archivo-check">
+        <input type="checkbox" data-path="${escapeHtml(f.path)}" ${marcado ? "checked" : ""}>
+        <span>${escapeHtml(f.nombre)}${f.tamano ? ` <span style="opacity:0.5">(${tamanoLegible(f.tamano)})</span>` : ""}</span>
+      </label>`;
+    }).join("");
+  cont.querySelectorAll('input[type="checkbox"]').forEach((chk) => {
+    chk.addEventListener("change", () => {
+      const path = chk.dataset.path;
+      if (chk.checked) estado.chatArchivosDesmarcados.delete(path);
+      else estado.chatArchivosDesmarcados.add(path);
+    });
+  });
 }
 
 async function cargarHistorialChat(temaId, bloque) {
@@ -419,7 +448,7 @@ function renderFileList(categoria) {
   (tema.archivos[categoria] || []).forEach((f) => {
     const li = document.createElement("li");
     li.className = "file-item";
-    li.innerHTML = `<a href="${f.url}" target="_blank" rel="noopener">${escapeHtml(f.nombre)}</a>
+    li.innerHTML = `<a href="${f.url}" target="_blank" rel="noopener">${escapeHtml(f.nombre)}${f.tamano ? ` <span style="opacity:0.5; font-size:0.78rem;">(${tamanoLegible(f.tamano)})</span>` : ""}</a>
       <button class="file-remove" title="Eliminar">✕</button>`;
     li.querySelector(".file-remove").addEventListener("click", () => borrarArchivo(categoria, f));
     ul.appendChild(li);
@@ -627,6 +656,7 @@ async function manejarArchivos(categoria, fileList) {
   await guardarIndice(`Sube archivos a "${tema.nombre}" / ${categoria}`);
   setSyncStatus("sincronizado");
   renderFileList(categoria);
+  renderSelectorArchivosChat();
 }
 
 async function borrarArchivo(categoria, archivo) {
@@ -643,6 +673,7 @@ async function borrarArchivo(categoria, archivo) {
   await guardarIndice(`Elimina archivo de "${tema.nombre}"`);
   setSyncStatus("sincronizado");
   renderFileList(categoria);
+  renderSelectorArchivosChat();
 }
 
 // ---------- Avisos de repaso ----------
@@ -669,6 +700,31 @@ function renderAvisos() {
 
 // ---------- IA: descarga de contexto ----------
 
+const LIMITE_ANTHROPIC_BYTES = 32 * 1024 * 1024; // límite real de la API, no depende de tu plan
+const INFLACION_BASE64 = 1.37; // el base64 pesa ~37% más que el archivo original
+
+function tamanoLegible(bytes) {
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+}
+
+// Devuelve un aviso (string) si los archivos pesan demasiado juntos para una sola
+// petición, o null si van bien. Los archivos sin tamaño guardado (subidos antes de
+// esta función) se ignoran en el cálculo, así que el aviso puede no dispararse para
+// material antiguo — pero si falla, ya sabes por qué.
+function comprobarTamanoConjunto(archivos) {
+  const totalBytes = archivos.reduce((sum, f) => sum + (f.tamano || 0), 0);
+  const estimado = totalBytes * INFLACION_BASE64;
+  if (estimado <= LIMITE_ANTHROPIC_BYTES * 0.9) return null;
+
+  const detalle = archivos
+    .filter((f) => f.tamano)
+    .sort((a, b) => b.tamano - a.tamano)
+    .map((f) => `${f.nombre} (${tamanoLegible(f.tamano)})`)
+    .join(", ");
+
+  return `Estos archivos pesan demasiado juntos para mandarlos en una sola petición (~${tamanoLegible(estimado)} tras convertir; el límite de Anthropic es 32 MB): ${detalle}. Desmarca alguno o pregunta con menos archivos a la vez.`;
+}
+
 async function descargarArchivosParaIA(archivos, limite = 4) {
   const seleccion = archivos.slice(-limite); // los más recientes
   const resultados = [];
@@ -694,6 +750,10 @@ async function generarExamen() {
   btn.textContent = "Generando examen...";
   btn.disabled = true;
   try {
+    const candidatosExamen = [...tema.archivos.esquemas.slice(-4), ...tema.archivos.examenes.slice(-2)];
+    const avisoTamano = comprobarTamanoConjunto(candidatosExamen);
+    if (avisoTamano) { alert(avisoTamano); return; }
+
     const esquemas = await descargarArchivosParaIA(tema.archivos.esquemas);
     const examenesPrevios = await descargarArchivosParaIA(tema.archivos.examenes, 2);
     if (esquemas.length === 0 && examenesPrevios.length === 0) {
@@ -721,6 +781,10 @@ async function generarResumenTema() {
   btn.textContent = "Generando resumen...";
   btn.disabled = true;
   try {
+    const candidatosResumen = [...tema.archivos.esquemas.slice(-4), ...tema.archivos.ejercicios.slice(-2)];
+    const avisoTamano = comprobarTamanoConjunto(candidatosResumen);
+    if (avisoTamano) { alert(avisoTamano); return; }
+
     const esquemas = await descargarArchivosParaIA(tema.archivos.esquemas);
     const ejercicios = await descargarArchivosParaIA(tema.archivos.ejercicios, 2);
     if (esquemas.length === 0 && ejercicios.length === 0) {
@@ -772,6 +836,10 @@ async function revisarErroresTema() {
   btn.textContent = "Revisando...";
   btn.disabled = true;
   try {
+    const candidatosErrores = [...tema.archivos.ejercicios.slice(-6), ...tema.archivos.examenes.slice(-3)];
+    const avisoTamano = comprobarTamanoConjunto(candidatosErrores);
+    if (avisoTamano) { alert(avisoTamano); return; }
+
     const ejercicios = await descargarArchivosParaIA(tema.archivos.ejercicios, 6);
     const examenes = await descargarArchivosParaIA(tema.archivos.examenes, 3);
     const material = [...ejercicios, ...examenes];
@@ -955,6 +1023,11 @@ async function ejecutarComparacion() {
   btn.textContent = "Comparando...";
   btn.disabled = true;
   try {
+    const candidatosA = [...temaA.archivos.esquemas, ...temaA.archivos.ejercicios].slice(-3);
+    const candidatosB = [...temaB.archivos.esquemas, ...temaB.archivos.ejercicios].slice(-3);
+    const avisoTamano = comprobarTamanoConjunto([...candidatosA, ...candidatosB]);
+    if (avisoTamano) { alert(avisoTamano); return; }
+
     const archivosA = await descargarArchivosParaIA([...temaA.archivos.esquemas, ...temaA.archivos.ejercicios], 3);
     const archivosB = await descargarArchivosParaIA([...temaB.archivos.esquemas, ...temaB.archivos.ejercicios], 3);
     if (archivosA.length === 0 || archivosB.length === 0) {
@@ -986,12 +1059,18 @@ async function enviarMensajeChat() {
   agregarMensajeChat("user", pregunta);
 
   const { tema } = buscarTema(estado.temaActivoId);
+  const candidatos = [...tema.archivos.esquemas, ...tema.archivos.ejercicios];
+  const marcados = candidatos.filter((f) => !estado.chatArchivosDesmarcados.has(f.path));
+
+  const avisoTamano = comprobarTamanoConjunto(marcados);
+  if (avisoTamano) {
+    agregarMensajeChat("assistant", avisoTamano);
+    return;
+  }
+
   const pensando = agregarMensajeChat("assistant", "Pensando...");
   try {
-    const contexto = await descargarArchivosParaIA([
-      ...tema.archivos.esquemas,
-      ...tema.archivos.ejercicios.slice(-2),
-    ]);
+    const contexto = await descargarArchivosParaIA(marcados, marcados.length || 1);
     const respuesta = await ClaudeAI.chatSobreTema(pregunta, tema.nombre, contexto, estado.historialChat);
     pensando.textContent = respuesta;
     estado.historialChat.push({ role: "user", content: pregunta });
