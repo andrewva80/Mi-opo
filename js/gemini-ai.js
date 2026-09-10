@@ -31,7 +31,15 @@ const GeminiAI = (() => {
       body: JSON.stringify({
         contents,
         system_instruction: systemText ? { parts: [{ text: systemText }] } : undefined,
-        generationConfig: { maxOutputTokens: 2000 },
+        generationConfig: {
+          maxOutputTokens: 3000,
+          // Sin esto, los modelos Gemini "piensan" por dentro antes de responder y ese
+          // pensamiento resta del mismo límite de tokens que la respuesta final — con
+          // límites normales, se puede comer casi todo el presupuesto y cortar la
+          // respuesta real a las primeras frases. Lo desactivamos: aquí no hace falta
+          // razonamiento complejo, solo organizar y redactar el material.
+          thinkingConfig: { thinkingBudget: 0 },
+        },
       }),
     });
     const data = await res.json();
@@ -43,10 +51,14 @@ const GeminiAI = (() => {
       const razon = data.promptFeedback?.blockReason;
       throw new Error(razon ? `Gemini bloqueó la respuesta (motivo: ${razon})` : "Gemini no devolvió ninguna respuesta.");
     }
-    return (candidato.content?.parts || [])
+    const texto = (candidato.content?.parts || [])
       .filter((p) => p.text)
       .map((p) => p.text)
       .join("\n");
+    if (candidato.finishReason === "MAX_TOKENS") {
+      return texto + "\n\n---\n*(Respuesta cortada por límite de longitud. Si falta algo importante, pídeselo de nuevo o divídelo en menos preguntas a la vez.)*";
+    }
+    return texto;
   }
 
   // Convierte el historial de chat {role:"user"|"assistant", content} al
