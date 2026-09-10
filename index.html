@@ -10,7 +10,7 @@
 </head>
 <body>
 
-<!-- Pantalla de configuración inicial (tokens de GitHub / Anthropic) -->
+<!-- Pantalla de configuración inicial (GitHub / Gemini) -->
 <div id="setup-screen" class="setup-screen hidden">
   <div class="setup-card">
     <h1>Configura tu parte</h1>
@@ -29,12 +29,12 @@
       <input type="password" id="gh-token" placeholder="github_pat_...">
     </label>
     <label class="field">
-      <span>API key de Anthropic (para el repaso con IA)</span>
-      <input type="password" id="anthropic-key" placeholder="sk-ant-...">
+      <span>API key de Gemini (gratis, para el repaso con IA)</span>
+      <input type="password" id="gemini-key" placeholder="AIzaSy...">
     </label>
 
     <button id="save-config" class="btn btn-primary">Guardar y entrar</button>
-    <p class="setup-help">¿No sabes crear el token? Mira el README.md del proyecto, sección "Primeros pasos".</p>
+    <p class="setup-help">¿No sabes sacar la key de Gemini? Mira el README.md del proyecto, sección "Primeros pasos".</p>
   </div>
 </div>
 
@@ -160,7 +160,7 @@
 </div>
 
 <script src="js/github-storage.js"></script>
-<script src="js/claude-ai.js"></script>
+<script src="js/gemini-ai.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
