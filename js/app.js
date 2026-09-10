@@ -762,7 +762,7 @@ async function generarExamen() {
     }
     const texto = await GeminiAI.generarExamenRepaso(tema.nombre, esquemas, examenesPrevios);
     abrirModal(`<h2 style="margin-bottom:14px;">Examen de repaso — ${escapeHtml(tema.nombre)}</h2>
-      <div style="white-space:pre-wrap; font-size:0.9rem; line-height:1.6;">${escapeHtml(texto)}</div>
+      <div style="font-size:0.9rem; line-height:1.6;">${formatearMarkdown(texto)}</div>
       <button class="btn btn-ghost" id="cerrar-examen" style="margin-top:18px;">Cerrar</button>`);
     document.getElementById("cerrar-examen").addEventListener("click", cerrarModal);
   } catch (e) {
@@ -794,7 +794,7 @@ async function generarResumenTema() {
     const texto = await GeminiAI.generarResumen(tema.nombre, esquemas, ejercicios);
     abrirModal(`
       <h2 style="margin-bottom:14px;">Resumen — ${escapeHtml(tema.nombre)}</h2>
-      <div style="white-space:pre-wrap; font-size:0.9rem; line-height:1.6; max-height:50vh; overflow-y:auto; margin-bottom:16px; background:var(--ink); border-radius:6px; padding:12px;">${escapeHtml(texto)}</div>
+      <div style="font-size:0.9rem; line-height:1.6; max-height:50vh; overflow-y:auto; margin-bottom:16px; background:var(--ink); border-radius:6px; padding:12px;">${formatearMarkdown(texto)}</div>
       <div style="display:flex; gap:10px; flex-wrap:wrap;">
         <button class="btn btn-primary" id="guardar-resumen">Guardar como archivo en Esquemas</button>
         <button class="btn btn-ghost" id="cerrar-resumen">Cerrar sin guardar</button>
@@ -850,7 +850,7 @@ async function revisarErroresTema() {
     const texto = await GeminiAI.revisarErrores(tema.nombre, material);
     abrirModal(`
       <h2 style="margin-bottom:14px;">En qué sueles fallar — ${escapeHtml(tema.nombre)}</h2>
-      <div style="white-space:pre-wrap; font-size:0.9rem; line-height:1.6; max-height:50vh; overflow-y:auto; margin-bottom:16px; background:var(--ink); border-radius:6px; padding:12px;">${escapeHtml(texto)}</div>
+      <div style="font-size:0.9rem; line-height:1.6; max-height:50vh; overflow-y:auto; margin-bottom:16px; background:var(--ink); border-radius:6px; padding:12px;">${formatearMarkdown(texto)}</div>
       <button class="btn btn-ghost" id="cerrar-errores">Cerrar</button>
     `);
     document.getElementById("cerrar-errores").addEventListener("click", cerrarModal);
@@ -1037,7 +1037,7 @@ async function ejecutarComparacion() {
     const texto = await GeminiAI.compararTemas(temaA.nombre, archivosA, temaB.nombre, archivosB);
     abrirModal(`
       <h2 style="margin-bottom:14px;">🆚 ${escapeHtml(temaA.nombre)} — vs — ${escapeHtml(temaB.nombre)}</h2>
-      <div style="white-space:pre-wrap; font-size:0.9rem; line-height:1.6; max-height:55vh; overflow-y:auto; background:var(--ink); border-radius:6px; padding:12px; margin-bottom:16px;">${escapeHtml(texto)}</div>
+      <div style="font-size:0.9rem; line-height:1.6; max-height:55vh; overflow-y:auto; background:var(--ink); border-radius:6px; padding:12px; margin-bottom:16px;">${formatearMarkdown(texto)}</div>
       <button class="btn btn-ghost" id="cerrar-comparacion">Cerrar</button>
     `);
     document.getElementById("cerrar-comparacion").addEventListener("click", cerrarModal);
@@ -1103,6 +1103,47 @@ function cerrarModal() {
 document.getElementById("modal-overlay")?.addEventListener("click", (e) => {
   if (e.target.id === "modal-overlay") cerrarModal();
 });
+
+function aplicarNegrita(s) {
+  return s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+}
+
+function formatearMarkdown(texto) {
+  const lineas = escapeHtml(texto).split("\n");
+  let html = "";
+  let enLista = false;
+  const tamanos = { 1: "1.15rem", 2: "1.08rem", 3: "1.02rem", 4: "0.95rem" };
+  for (const linea of lineas) {
+    const l = linea.trim();
+    if (l === "") {
+      if (enLista) { html += "</ul>"; enLista = false; }
+      html += "<div style='height:6px;'></div>";
+      continue;
+    }
+    if (/^---+$/.test(l)) {
+      if (enLista) { html += "</ul>"; enLista = false; }
+      html += `<hr style="border:none; border-top:1px solid ${'var(--line)'}; margin:14px 0;">`;
+      continue;
+    }
+    const encabezado = l.match(/^(#{1,4})\s+(.*)/);
+    if (encabezado) {
+      if (enLista) { html += "</ul>"; enLista = false; }
+      const nivel = encabezado[1].length;
+      html += `<div style="font-weight:700; font-size:${tamanos[nivel] || "1rem"}; margin:12px 0 6px;">${aplicarNegrita(encabezado[2])}</div>`;
+      continue;
+    }
+    const item = l.match(/^[-*]\s+(.*)/);
+    if (item) {
+      if (!enLista) { html += '<ul style="margin:4px 0 8px; padding-left:20px;">'; enLista = true; }
+      html += `<li style="margin-bottom:4px;">${aplicarNegrita(item[1])}</li>`;
+      continue;
+    }
+    if (enLista) { html += "</ul>"; enLista = false; }
+    html += `<div style="margin-bottom:6px;">${aplicarNegrita(l)}</div>`;
+  }
+  if (enLista) html += "</ul>";
+  return html;
+}
 
 // ---------- Utilidades ----------
 
