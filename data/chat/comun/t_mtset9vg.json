@@ -1,3 +1,12 @@
 {
-  "historial": []
+  "historial": [
+    {
+      "role": "user",
+      "content": "Cómo estudiarías este tema"
+    },
+    {
+      "role": "assistant",
+      "content": "Como preparador, te voy a estructurar el estudio de este tema del IVASPE (Tema 5: *Rescate en accidentes de tráfico*) para optimizar el tiempo e ir **directo a las preguntas trampa de examen**. \n\nEste tema es un clásico en los exámenes de la Comunidad Valenciana (Consorcios de Valencia, Alicante, Castellón"
+    }
+  ]
 }
