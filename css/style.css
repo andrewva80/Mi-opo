@@ -278,6 +278,34 @@ input:focus, textarea:focus, button:focus-visible {
   position: sticky;
   top: 78px;
 }
+.ai-panel.ampliado {
+  position: fixed;
+  inset: 78px 0 0 0;
+  z-index: 45;
+  width: auto;
+  max-width: none;
+  border-left: none;
+  border-top: 1px solid var(--line);
+  background: var(--ink);
+  padding: 20px 8vw;
+}
+.ai-panel.ampliado .chat-log {
+  flex: 1;
+  max-height: none;
+}
+.ai-panel.ampliado .chat-msg {
+  font-size: 1rem;
+  max-width: 70%;
+  padding: 12px 16px;
+}
+.ai-panel.ampliado .chat-form textarea {
+  font-size: 1rem;
+  min-height: 52px;
+}
+.ai-panel.ampliado .chat-form .btn {
+  font-size: 1rem;
+  padding: 12px 20px;
+}
 .ai-panel-header {
   display: flex;
   align-items: center;
