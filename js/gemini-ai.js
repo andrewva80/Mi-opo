@@ -32,7 +32,7 @@ const GeminiAI = (() => {
         contents,
         system_instruction: systemText ? { parts: [{ text: systemText }] } : undefined,
         generationConfig: {
-          maxOutputTokens: 3000,
+          maxOutputTokens: 8192,
           // Sin esto, los modelos Gemini "piensan" por dentro antes de responder y ese
           // pensamiento resta del mismo límite de tokens que la respuesta final — con
           // límites normales, se puede comer casi todo el presupuesto y cortar la
