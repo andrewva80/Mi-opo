@@ -44,7 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const cfg = cargarConfig();
   if (cfg) {
     GitHubStorage.init(cfg.github);
-    ClaudeAI.init(cfg.anthropicKey);
+    GeminiAI.init(cfg.geminiKey);
     mostrarApp();
   } else {
     mostrarSetup();
@@ -83,7 +83,7 @@ function cablearEventosSetup() {
         repo: val("gh-repo"),
         token: val("gh-token"),
       },
-      anthropicKey: val("anthropic-key"),
+      geminiKey: val("gemini-key"),
     };
     if (!cfg.github.owner || !cfg.github.repo || !cfg.github.token) {
       alert("Rellena al menos el owner, el repo y el token de GitHub.");
@@ -98,7 +98,7 @@ function cablearEventosSetup() {
       btn.textContent = "Guardar y entrar";
       return;
     }
-    ClaudeAI.init(cfg.anthropicKey);
+    GeminiAI.init(cfg.geminiKey);
     guardarConfig(cfg);
     mostrarApp();
   });
@@ -700,7 +700,7 @@ function renderAvisos() {
 
 // ---------- IA: descarga de contexto ----------
 
-const LIMITE_ANTHROPIC_BYTES = 32 * 1024 * 1024; // límite real de la API, no depende de tu plan
+const LIMITE_GEMINI_BYTES = 100 * 1024 * 1024; // límite real de la API de Gemini (inline), no depende de tu plan
 const INFLACION_BASE64 = 1.37; // el base64 pesa ~37% más que el archivo original
 
 function tamanoLegible(bytes) {
@@ -714,7 +714,7 @@ function tamanoLegible(bytes) {
 function comprobarTamanoConjunto(archivos) {
   const totalBytes = archivos.reduce((sum, f) => sum + (f.tamano || 0), 0);
   const estimado = totalBytes * INFLACION_BASE64;
-  if (estimado <= LIMITE_ANTHROPIC_BYTES * 0.9) return null;
+  if (estimado <= LIMITE_GEMINI_BYTES * 0.9) return null;
 
   const detalle = archivos
     .filter((f) => f.tamano)
@@ -722,7 +722,7 @@ function comprobarTamanoConjunto(archivos) {
     .map((f) => `${f.nombre} (${tamanoLegible(f.tamano)})`)
     .join(", ");
 
-  return `Estos archivos pesan demasiado juntos para mandarlos en una sola petición (~${tamanoLegible(estimado)} tras convertir; el límite de Anthropic es 32 MB): ${detalle}. Desmarca alguno o pregunta con menos archivos a la vez.`;
+  return `Estos archivos pesan demasiado juntos para mandarlos en una sola petición (~${tamanoLegible(estimado)} tras convertir; el límite de Gemini es 100 MB): ${detalle}. Desmarca alguno o pregunta con menos archivos a la vez.`;
 }
 
 async function descargarArchivosParaIA(archivos, limite = 4) {
@@ -744,7 +744,7 @@ async function descargarArchivosParaIA(archivos, limite = 4) {
 }
 
 async function generarExamen() {
-  if (!ClaudeAI.isReady()) { alert("Falta la API key de Anthropic en la configuración."); return; }
+  if (!GeminiAI.isReady()) { alert("Falta la API key de Gemini en la configuración."); return; }
   const { tema } = buscarTema(estado.temaActivoId);
   const btn = document.getElementById("btn-generar-examen");
   btn.textContent = "Generando examen...";
@@ -760,7 +760,7 @@ async function generarExamen() {
       alert("Sube al menos un esquema o examen a este tema para poder generar el repaso.");
       return;
     }
-    const texto = await ClaudeAI.generarExamenRepaso(tema.nombre, esquemas, examenesPrevios);
+    const texto = await GeminiAI.generarExamenRepaso(tema.nombre, esquemas, examenesPrevios);
     abrirModal(`<h2 style="margin-bottom:14px;">Examen de repaso — ${escapeHtml(tema.nombre)}</h2>
       <div style="white-space:pre-wrap; font-size:0.9rem; line-height:1.6;">${escapeHtml(texto)}</div>
       <button class="btn btn-ghost" id="cerrar-examen" style="margin-top:18px;">Cerrar</button>`);
@@ -774,7 +774,7 @@ async function generarExamen() {
 }
 
 async function generarResumenTema() {
-  if (!ClaudeAI.isReady()) { alert("Falta la API key de Anthropic en la configuración."); return; }
+  if (!GeminiAI.isReady()) { alert("Falta la API key de Gemini en la configuración."); return; }
   const { tema, bloque } = buscarTema(estado.temaActivoId);
   const btn = document.getElementById("btn-generar-resumen");
   const textoOriginalBtn = btn.textContent;
@@ -791,7 +791,7 @@ async function generarResumenTema() {
       alert("Sube al menos un esquema o ejercicio a este tema para poder generar el resumen.");
       return;
     }
-    const texto = await ClaudeAI.generarResumen(tema.nombre, esquemas, ejercicios);
+    const texto = await GeminiAI.generarResumen(tema.nombre, esquemas, ejercicios);
     abrirModal(`
       <h2 style="margin-bottom:14px;">Resumen — ${escapeHtml(tema.nombre)}</h2>
       <div style="white-space:pre-wrap; font-size:0.9rem; line-height:1.6; max-height:50vh; overflow-y:auto; margin-bottom:16px; background:var(--ink); border-radius:6px; padding:12px;">${escapeHtml(texto)}</div>
@@ -829,7 +829,7 @@ async function generarResumenTema() {
 }
 
 async function revisarErroresTema() {
-  if (!ClaudeAI.isReady()) { alert("Falta la API key de Anthropic en la configuración."); return; }
+  if (!GeminiAI.isReady()) { alert("Falta la API key de Gemini en la configuración."); return; }
   const { tema } = buscarTema(estado.temaActivoId);
   const btn = document.getElementById("btn-revisar-errores");
   const textoOriginalBtn = btn.textContent;
@@ -847,7 +847,7 @@ async function revisarErroresTema() {
       alert("Sube al menos un ejercicio o examen ya corregido a este tema para poder revisar tus errores.");
       return;
     }
-    const texto = await ClaudeAI.revisarErrores(tema.nombre, material);
+    const texto = await GeminiAI.revisarErrores(tema.nombre, material);
     abrirModal(`
       <h2 style="margin-bottom:14px;">En qué sueles fallar — ${escapeHtml(tema.nombre)}</h2>
       <div style="white-space:pre-wrap; font-size:0.9rem; line-height:1.6; max-height:50vh; overflow-y:auto; margin-bottom:16px; background:var(--ink); border-radius:6px; padding:12px;">${escapeHtml(texto)}</div>
@@ -1008,7 +1008,7 @@ function abrirModalComparar() {
 }
 
 async function ejecutarComparacion() {
-  if (!ClaudeAI.isReady()) { alert("Falta la API key de Anthropic en la configuración."); return; }
+  if (!GeminiAI.isReady()) { alert("Falta la API key de Gemini en la configuración."); return; }
   const valA = document.getElementById("comparar-tema-a").value;
   const valB = document.getElementById("comparar-tema-b").value;
   if (valA === valB) { alert("Elige dos temas distintos."); return; }
@@ -1034,7 +1034,7 @@ async function ejecutarComparacion() {
       alert("Ambos temas necesitan al menos un archivo subido (esquema o ejercicio) para poder compararlos.");
       return;
     }
-    const texto = await ClaudeAI.compararTemas(temaA.nombre, archivosA, temaB.nombre, archivosB);
+    const texto = await GeminiAI.compararTemas(temaA.nombre, archivosA, temaB.nombre, archivosB);
     abrirModal(`
       <h2 style="margin-bottom:14px;">🆚 ${escapeHtml(temaA.nombre)} — vs — ${escapeHtml(temaB.nombre)}</h2>
       <div style="white-space:pre-wrap; font-size:0.9rem; line-height:1.6; max-height:55vh; overflow-y:auto; background:var(--ink); border-radius:6px; padding:12px; margin-bottom:16px;">${escapeHtml(texto)}</div>
@@ -1051,7 +1051,7 @@ async function ejecutarComparacion() {
 // ---------- Chat ----------
 
 async function enviarMensajeChat() {
-  if (!ClaudeAI.isReady()) { alert("Falta la API key de Anthropic en la configuración."); return; }
+  if (!GeminiAI.isReady()) { alert("Falta la API key de Gemini en la configuración."); return; }
   const input = document.getElementById("chat-input");
   const pregunta = input.value.trim();
   if (!pregunta || !estado.temaActivoId) return;
@@ -1071,7 +1071,7 @@ async function enviarMensajeChat() {
   const pensando = agregarMensajeChat("assistant", "Pensando...");
   try {
     const contexto = await descargarArchivosParaIA(marcados, marcados.length || 1);
-    const respuesta = await ClaudeAI.chatSobreTema(pregunta, tema.nombre, contexto, estado.historialChat);
+    const respuesta = await GeminiAI.chatSobreTema(pregunta, tema.nombre, contexto, estado.historialChat);
     pensando.textContent = respuesta;
     estado.historialChat.push({ role: "user", content: pregunta });
     estado.historialChat.push({ role: "assistant", content: respuesta });
