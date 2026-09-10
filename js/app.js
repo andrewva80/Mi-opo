@@ -203,6 +203,13 @@ function cablearEventosApp() {
   });
 
   document.getElementById("btn-vaciar-chat").addEventListener("click", vaciarHistorialChat);
+
+  document.getElementById("btn-ampliar-chat").addEventListener("click", () => {
+    const panel = document.getElementById("ai-panel");
+    const btn = document.getElementById("btn-ampliar-chat");
+    const ampliado = panel.classList.toggle("ampliado");
+    btn.textContent = ampliado ? "⤡ Reducir" : "⤢ Ampliar";
+  });
 }
 
 // ---------- Sidebar / temas ----------
@@ -1072,7 +1079,7 @@ async function enviarMensajeChat() {
   try {
     const contexto = await descargarArchivosParaIA(marcados, marcados.length || 1);
     const respuesta = await GeminiAI.chatSobreTema(pregunta, tema.nombre, contexto, estado.historialChat);
-    pensando.textContent = respuesta;
+    pensando.innerHTML = formatearMarkdown(respuesta);
     estado.historialChat.push({ role: "user", content: pregunta });
     estado.historialChat.push({ role: "assistant", content: respuesta });
     await guardarHistorialChat();
@@ -1085,7 +1092,11 @@ function agregarMensajeChat(rol, texto) {
   const log = document.getElementById("chat-log");
   const div = document.createElement("div");
   div.className = "chat-msg " + (rol === "user" ? "chat-user" : "chat-assistant");
-  div.textContent = texto;
+  if (rol === "user") {
+    div.textContent = texto;
+  } else {
+    div.innerHTML = formatearMarkdown(texto);
+  }
   log.appendChild(div);
   log.scrollTop = log.scrollHeight;
   return div;
