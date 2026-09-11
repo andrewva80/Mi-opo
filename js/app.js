@@ -204,6 +204,13 @@ function cablearEventosApp() {
 
   document.getElementById("btn-vaciar-chat").addEventListener("click", vaciarHistorialChat);
 
+  document.getElementById("avisos-header").addEventListener("click", () => {
+    const cont = document.getElementById("avisos");
+    const flecha = document.getElementById("avisos-flecha");
+    const colapsado = cont.classList.toggle("colapsado");
+    flecha.textContent = colapsado ? "▸" : "▾";
+  });
+
   document.getElementById("btn-ampliar-chat").addEventListener("click", () => {
     const panel = document.getElementById("ai-panel");
     const btn = document.getElementById("btn-ampliar-chat");
@@ -703,6 +710,8 @@ function renderAvisos() {
     div.textContent = `${p.tema.nombre} — ${texto}`;
     cont.appendChild(div);
   });
+  document.getElementById("avisos-titulo").textContent =
+    pendientes.length > 0 ? `⚠️ Avisos de repaso (${pendientes.length})` : "Avisos de repaso (al día)";
 }
 
 // ---------- IA: descarga de contexto ----------
@@ -750,34 +759,218 @@ async function descargarArchivosParaIA(archivos, limite = 4) {
   return resultados;
 }
 
-async function generarExamen() {
+function generarExamen() {
   if (!GeminiAI.isReady()) { alert("Falta la API key de Gemini en la configuración."); return; }
-  const { tema } = buscarTema(estado.temaActivoId);
-  const btn = document.getElementById("btn-generar-examen");
-  btn.textContent = "Generando examen...";
-  btn.disabled = true;
-  try {
-    const candidatosExamen = [...tema.archivos.esquemas.slice(-4), ...tema.archivos.examenes.slice(-2)];
-    const avisoTamano = comprobarTamanoConjunto(candidatosExamen);
-    if (avisoTamano) { alert(avisoTamano); return; }
+  const { tema, bloque } = buscarTema(estado.temaActivoId);
+  abrirModal(`
+    <h2 style="margin-bottom:14px;">Configura tu examen</h2>
+    <p style="font-size:0.85rem; color:rgba(241,237,228,0.6); margin-bottom:14px;">
+      Son 8 preguntas tipo test basadas en tu material de este tema.
+    </p>
+    <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:18px;">
+      <label style="display:flex; align-items:center; gap:8px; font-size:0.88rem;">
+        <input type="radio" name="modo-correccion" value="momento" checked>
+        Corregir cada pregunta al momento (ves si acertaste nada más responder)
+      </label>
+      <label style="display:flex; align-items:center; gap:8px; font-size:0.88rem;">
+        <input type="radio" name="modo-correccion" value="final">
+        Corregir todo al final (respondes las 8 seguidas, sin pistas hasta el resultado)
+      </label>
+    </div>
+    <div style="display:flex; gap:10px;">
+      <button id="confirmar-config-examen" class="btn btn-primary">Generar examen</button>
+      <button id="cancelar-config-examen" class="btn btn-ghost">Cancelar</button>
+    </div>
+  `);
+  document.getElementById("cancelar-config-examen").addEventListener("click", cerrarModal);
+  document.getElementById("confirmar-config-examen").addEventListener("click", () => {
+    const modo = document.querySelector('input[name="modo-correccion"]:checked').value;
+    lanzarGeneracionExamen(tema, bloque, modo);
+  });
+}
 
+async function lanzarGeneracionExamen(tema, bloque, modo) {
+  const candidatosExamen = [...tema.archivos.esquemas.slice(-4), ...tema.archivos.examenes.slice(-2)];
+  const avisoTamano = comprobarTamanoConjunto(candidatosExamen);
+  if (avisoTamano) { alert(avisoTamano); return; }
+
+  setModalCargando("Generando tu examen...");
+  try {
     const esquemas = await descargarArchivosParaIA(tema.archivos.esquemas);
     const examenesPrevios = await descargarArchivosParaIA(tema.archivos.examenes, 2);
     if (esquemas.length === 0 && examenesPrevios.length === 0) {
       alert("Sube al menos un esquema o examen a este tema para poder generar el repaso.");
+      cerrarModal();
       return;
     }
-    const texto = await GeminiAI.generarExamenRepaso(tema.nombre, esquemas, examenesPrevios);
-    abrirModal(`<h2 style="margin-bottom:14px;">Examen de repaso — ${escapeHtml(tema.nombre)}</h2>
-      <div style="font-size:0.9rem; line-height:1.6;">${formatearMarkdown(texto)}</div>
-      <button class="btn btn-ghost" id="cerrar-examen" style="margin-top:18px;">Cerrar</button>`);
-    document.getElementById("cerrar-examen").addEventListener("click", cerrarModal);
+    const preguntas = await GeminiAI.generarExamenInteractivo(tema.nombre, esquemas, examenesPrevios);
+    iniciarExamenInteractivo(preguntas, modo, tema, bloque);
   } catch (e) {
     alert(e.message);
-  } finally {
-    btn.textContent = "Generar examen rápido de repaso";
-    btn.disabled = false;
+    cerrarModal();
   }
+}
+
+function setModalCargando(texto) {
+  abrirModal(`<div style="text-align:center; padding:20px; font-size:0.9rem;">${escapeHtml(texto)}</div>`);
+}
+
+// ---------- Examen interactivo ----------
+
+function iniciarExamenInteractivo(preguntas, modo, tema, bloque) {
+  const ex = {
+    preguntas,
+    modo,
+    indice: 0,
+    respuestas: preguntas.map(() => ({ seleccion: null, dificultad: null })),
+  };
+  renderPreguntaExamen(ex, tema, bloque);
+}
+
+function renderPreguntaExamen(ex, tema, bloque) {
+  const i = ex.indice;
+  const p = ex.preguntas[i];
+  const r = ex.respuestas[i];
+  const yaRespondida = r.seleccion !== null;
+  const mostrarCorreccion = ex.modo === "momento" && yaRespondida;
+
+  const opcionesHtml = p.opciones
+    .map((op, idx) => {
+      let clase = "opcion-examen";
+      if (yaRespondida && idx === r.seleccion) clase += " seleccionada";
+      if (mostrarCorreccion) {
+        if (idx === p.correcta) clase += " correcta";
+        else if (idx === r.seleccion) clase += " incorrecta";
+      }
+      return `<button class="${clase}" data-idx="${idx}" ${yaRespondida ? "disabled" : ""}>${String.fromCharCode(65 + idx)}. ${escapeHtml(op)}</button>`;
+    })
+    .join("");
+
+  const explicacionHtml = mostrarCorreccion
+    ? `<div class="explicacion-examen">${r.seleccion === p.correcta ? "✅ Correcto." : "❌ Incorrecto."} ${escapeHtml(p.explicacion || "")}</div>`
+    : "";
+
+  const dificultadHtml = yaRespondida
+    ? `<div class="dificultad-selector">
+        <span>¿Qué tal esta pregunta?</span>
+        <button class="chip-dificultad ${r.dificultad === "facil" ? "activo" : ""}" data-dif="facil">😌 Fácil</button>
+        <button class="chip-dificultad ${r.dificultad === "normal" ? "activo" : ""}" data-dif="normal">🙂 Normal</button>
+        <button class="chip-dificultad ${r.dificultad === "dificil" ? "activo" : ""}" data-dif="dificil">😖 Difícil</button>
+      </div>`
+    : "";
+
+  const puedeAvanzar = yaRespondida && r.dificultad;
+  const esUltima = i === ex.preguntas.length - 1;
+
+  abrirModal(`
+    <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:10px;">
+      <h2 style="margin:0; font-size:1.1rem;">Pregunta ${i + 1} / ${ex.preguntas.length}</h2>
+      <span class="badge">${escapeHtml(tema.nombre)}</span>
+    </div>
+    <p style="font-size:0.95rem; margin-bottom:14px; line-height:1.5;">${escapeHtml(p.pregunta)}</p>
+    <div class="opciones-examen">${opcionesHtml}</div>
+    ${explicacionHtml}
+    ${dificultadHtml}
+    <div style="display:flex; gap:10px; margin-top:18px; flex-wrap:wrap;">
+      ${puedeAvanzar ? `<button id="btn-siguiente-pregunta" class="btn btn-primary">${esUltima ? "Ver resultado final" : "Siguiente pregunta"}</button>` : ""}
+      <button id="salir-examen-interactivo" class="btn btn-ghost">Salir del examen</button>
+    </div>
+  `);
+
+  document.querySelectorAll(".opcion-examen").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (r.seleccion !== null) return;
+      r.seleccion = parseInt(btn.dataset.idx, 10);
+      renderPreguntaExamen(ex, tema, bloque);
+    });
+  });
+  document.querySelectorAll(".chip-dificultad").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      r.dificultad = btn.dataset.dif;
+      renderPreguntaExamen(ex, tema, bloque);
+    });
+  });
+  const btnSiguiente = document.getElementById("btn-siguiente-pregunta");
+  if (btnSiguiente) {
+    btnSiguiente.addEventListener("click", () => {
+      if (esUltima) mostrarResultadoExamen(ex, tema, bloque);
+      else {
+        ex.indice++;
+        renderPreguntaExamen(ex, tema, bloque);
+      }
+    });
+  }
+  document.getElementById("salir-examen-interactivo").addEventListener("click", () => {
+    if (confirm("¿Salir del examen? Perderás el progreso de esta sesión.")) cerrarModal();
+  });
+}
+
+function mostrarResultadoExamen(ex, tema, bloque) {
+  const total = ex.preguntas.length;
+  const correctas = ex.respuestas.filter((r, i) => r.seleccion === ex.preguntas[i].correcta).length;
+  const dificiles = ex.respuestas.filter((r) => r.dificultad === "dificil").length;
+
+  const listaHtml = ex.preguntas
+    .map((p, i) => {
+      const r = ex.respuestas[i];
+      const acierto = r.seleccion === p.correcta;
+      const emojiDif = { facil: "😌", normal: "🙂", dificil: "😖" }[r.dificultad] || "";
+      return `<div style="border-bottom:1px solid var(--line); padding:10px 0;">
+        <div style="font-size:0.85rem; margin-bottom:4px;">${acierto ? "✅" : "❌"} <strong>${i + 1}.</strong> ${escapeHtml(p.pregunta)}</div>
+        <div style="font-size:0.76rem; color:rgba(241,237,228,0.6);">
+          Tu respuesta: ${escapeHtml(p.opciones[r.seleccion] ?? "(sin responder)")}${!acierto ? ` · Correcta: ${escapeHtml(p.opciones[p.correcta])}` : ""} · ${emojiDif} ${r.dificultad || "sin marcar"}
+        </div>
+      </div>`;
+    })
+    .join("");
+
+  abrirModal(`
+    <h2 style="margin-bottom:6px;">Resultado — ${escapeHtml(tema.nombre)}</h2>
+    <p style="font-size:1.25rem; font-weight:700; margin-bottom:2px;">${correctas} / ${total} correctas</p>
+    <p style="font-size:0.8rem; color:rgba(241,237,228,0.55); margin-bottom:16px;">
+      ${dificiles > 0 ? `${dificiles} pregunta(s) marcadas como difíciles — buen material para "Revisar mis errores" luego.` : "Ninguna marcada como difícil, buen trabajo."}
+    </p>
+    <div style="max-height:42vh; overflow-y:auto; margin-bottom:16px;">${listaHtml}</div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button id="guardar-resultado-examen" class="btn btn-primary">Guardar resultado en Exámenes</button>
+      <button id="cerrar-resultado-examen" class="btn btn-ghost">Cerrar</button>
+    </div>
+  `);
+  document.getElementById("cerrar-resultado-examen").addEventListener("click", cerrarModal);
+  document.getElementById("guardar-resultado-examen").addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    btn.textContent = "Guardando...";
+    btn.disabled = true;
+    try {
+      const texto = construirTextoResultadoExamen(tema, ex, correctas, total);
+      const nombreArchivo = `Resultado examen - ${new Date().toLocaleDateString("es-ES")}.md`;
+      const meta = await GitHubStorage.uploadTextFile(bloque, tema.id, "examenes", nombreArchivo, texto);
+      tema.archivos.examenes.push(meta);
+      setSyncStatus("guardando...");
+      await guardarIndice(`Guarda resultado de examen en "${tema.nombre}"`);
+      setSyncStatus("sincronizado");
+      if (estado.temaActivoId === tema.id && estado.categoriaActiva === "examenes") renderFileList("examenes");
+      cerrarModal();
+    } catch (err) {
+      alert(err.message);
+      btn.textContent = "Guardar resultado en Exámenes";
+      btn.disabled = false;
+    }
+  });
+}
+
+function construirTextoResultadoExamen(tema, ex, correctas, total) {
+  const fecha = new Date().toLocaleDateString("es-ES");
+  const lineas = [`# Resultado de examen — ${tema.nombre} (${fecha})`, ``, `**Puntuación: ${correctas}/${total}**`, ``];
+  ex.preguntas.forEach((p, i) => {
+    const r = ex.respuestas[i];
+    const acierto = r.seleccion === p.correcta;
+    lineas.push(`${i + 1}. ${p.pregunta}`);
+    lineas.push(`   - Tu respuesta: ${p.opciones[r.seleccion] ?? "(sin responder)"} ${acierto ? "(correcta)" : `(incorrecta, la correcta era: ${p.opciones[p.correcta]})`}`);
+    lineas.push(`   - Dificultad marcada por el usuario: ${r.dificultad || "sin marcar"}`);
+    lineas.push(``);
+  });
+  return lineas.join("\n");
 }
 
 async function generarResumenTema() {
