@@ -313,7 +313,23 @@ input:focus, textarea:focus, button:focus-visible {
   margin-bottom: 10px;
 }
 .ai-panel-header h3 { font-size: 0.95rem; }
+.avisos-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: var(--ink-soft);
+  border: 1px solid var(--line-strong);
+  font-size: 0.78rem;
+  color: var(--amber);
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+.avisos-header:hover { border-color: var(--amber); }
 .avisos { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.avisos.colapsado { display: none; }
 .aviso {
   background: rgba(224,164,88,0.1);
   border: 1px solid rgba(224,164,88,0.3);
@@ -347,7 +363,52 @@ input:focus, textarea:focus, button:focus-visible {
 }
 .chat-archivo-check input { accent-color: var(--ember); }
 
-/* ---------- Modal ---------- */
+/* ---------- Examen interactivo ---------- */
+.opciones-examen { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.opcion-examen {
+  text-align: left;
+  background: var(--ink-soft);
+  border: 1px solid var(--line-strong);
+  color: var(--paper);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+.opcion-examen:hover:not(:disabled) { border-color: var(--amber); }
+.opcion-examen:disabled { cursor: default; opacity: 0.9; }
+.opcion-examen.seleccionada { border-color: var(--steel); background: rgba(60, 88, 120, 0.35); }
+.opcion-examen.correcta { border-color: #4caf7d; background: rgba(76, 175, 125, 0.15); color: #8fe3b8; }
+.opcion-examen.incorrecta { border-color: var(--danger); background: rgba(217, 128, 113, 0.15); color: var(--danger); }
+.explicacion-examen {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  background: var(--ink);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+.dificultad-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: rgba(241, 237, 228, 0.6);
+  margin-bottom: 4px;
+}
+.chip-dificultad {
+  background: var(--ink-soft);
+  border: 1px solid var(--line-strong);
+  color: var(--paper);
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 0.78rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+.chip-dificultad.activo { border-color: var(--amber); color: var(--amber); background: rgba(224, 164, 88, 0.12); }
 .modal-overlay {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.55);
