@@ -20,8 +20,18 @@ const GeminiAI = (() => {
     return !!apiKey;
   }
 
-  async function callGemini(contents, systemText) {
+  async function callGemini(contents, systemText, jsonMode = false) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
+    const generationConfig = {
+      maxOutputTokens: 8192,
+      // Sin esto, los modelos Gemini "piensan" por dentro antes de responder y ese
+      // pensamiento resta del mismo límite de tokens que la respuesta final — con
+      // límites normales, se puede comer casi todo el presupuesto y cortar la
+      // respuesta real a las primeras frases. Lo desactivamos: aquí no hace falta
+      // razonamiento complejo, solo organizar y redactar el material.
+      thinkingConfig: { thinkingBudget: 0 },
+    };
+    if (jsonMode) generationConfig.responseMimeType = "application/json";
     const res = await fetch(url, {
       method: "POST",
       headers: {
@@ -31,15 +41,7 @@ const GeminiAI = (() => {
       body: JSON.stringify({
         contents,
         system_instruction: systemText ? { parts: [{ text: systemText }] } : undefined,
-        generationConfig: {
-          maxOutputTokens: 8192,
-          // Sin esto, los modelos Gemini "piensan" por dentro antes de responder y ese
-          // pensamiento resta del mismo límite de tokens que la respuesta final — con
-          // límites normales, se puede comer casi todo el presupuesto y cortar la
-          // respuesta real a las primeras frases. Lo desactivamos: aquí no hace falta
-          // razonamiento complejo, solo organizar y redactar el material.
-          thinkingConfig: { thinkingBudget: 0 },
-        },
+        generationConfig,
       }),
     });
     const data = await res.json();
@@ -92,14 +94,31 @@ qué falló y por qué, sin dar rodeos. Responde en español.`;
     return callGemini(contents, SYSTEM_BASE);
   }
 
-  async function generarExamenRepaso(temaNombre, archivosEsquemas, archivosExamenesPrevios) {
+  async function generarExamenInteractivo(temaNombre, archivosEsquemas, archivosExamenesPrevios) {
     const blocks = [...filesToBlocks(archivosEsquemas), ...filesToBlocks(archivosExamenesPrevios)];
     const instruccion = `Basándote en el material adjunto del tema "${temaNombre}" (esquemas/resúmenes
-y, si los hay, exámenes anteriores), genera un examen rápido de repaso de 8 preguntas tipo test
-(4 opciones, una correcta). Al final incluye las respuestas correctas con una explicación breve
-de una línea por pregunta. Numera las preguntas.`;
+y, si los hay, exámenes anteriores), genera un examen de repaso de exactamente 8 preguntas tipo test,
+cada una con 4 opciones y una sola correcta.
+Devuelve EXCLUSIVAMENTE un array JSON válido, sin texto antes ni después, con este formato exacto:
+[{"pregunta": "texto de la pregunta", "opciones": ["opción A", "opción B", "opción C", "opción D"], "correcta": 0, "explicacion": "por qué es correcta, en una frase breve"}]
+"correcta" es el índice (0 a 3) de la opción correcta dentro de "opciones".`;
     const contents = [{ role: "user", parts: [...blocks, { text: instruccion }] }];
-    return callGemini(contents, SYSTEM_BASE);
+    const texto = await callGemini(contents, SYSTEM_BASE, true);
+    return parsearExamenJSON(texto);
+  }
+
+  function parsearExamenJSON(texto) {
+    let limpio = texto.trim().replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/```\s*$/, "");
+    let datos;
+    try {
+      datos = JSON.parse(limpio);
+    } catch {
+      throw new Error("No se pudo interpretar el examen generado. Prueba a generarlo de nuevo.");
+    }
+    if (!Array.isArray(datos) || datos.length === 0) {
+      throw new Error("El examen generado no tiene el formato esperado. Prueba a generarlo de nuevo.");
+    }
+    return datos;
   }
 
   async function generarResumen(temaNombre, archivosEsquemas, archivosEjercicios) {
@@ -137,5 +156,5 @@ Sé conciso y ve al grano.`;
     return callGemini(contents, SYSTEM_BASE);
   }
 
-  return { init, isReady, chatSobreTema, generarExamenRepaso, generarResumen, revisarErrores, compararTemas };
+  return { init, isReady, chatSobreTema, generarExamenInteractivo, generarResumen, revisarErrores, compararTemas };
 })();
