@@ -426,3 +426,17 @@ input:focus, textarea:focus, button:focus-visible {
   max-height: 84vh;
   overflow-y: auto;
 }
+.modal.ancho {
+  max-width: 96vw;
+}
+.markmap {
+  position: relative;
+  background: var(--ink);
+  border-radius: 8px;
+  border: 1px solid var(--line);
+}
+.markmap > svg {
+  width: 100%;
+  height: 64vh;
+  display: block;
+}
