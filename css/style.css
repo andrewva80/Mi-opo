@@ -434,9 +434,21 @@ input:focus, textarea:focus, button:focus-visible {
   background: var(--ink);
   border-radius: 8px;
   border: 1px solid var(--line);
+  overflow: hidden;
 }
 .markmap > svg {
   width: 100%;
-  height: 64vh;
+  height: 68vh;
   display: block;
 }
+/* Markmap pinta el texto en negro por defecto (asume fondo claro). Lo forzamos
+   a claro aquí; hay que apuntar tanto al contenido HTML embebido (foreignObject,
+   que es como renderiza el texto normalmente) como a <text> por si acaso, o
+   la mitad de las etiquetas se quedan en negro sobre nuestro fondo oscuro. */
+.markmap foreignObject, .markmap foreignObject * {
+  color: var(--paper) !important;
+}
+.markmap text {
+  fill: var(--paper) !important;
+}
+.markmap a { color: var(--amber) !important; }
