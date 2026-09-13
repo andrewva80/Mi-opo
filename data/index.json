@@ -91,17 +91,7 @@
       "carpeta": "Leyes",
       "ultimaRevision": null,
       "archivos": {
-        "esquemas": [
-          {
-            "nombre": "BOE-A-1985-5392-consolidado tema.pdf",
-            "path": "files/comun/t_mu06vmzg/esquemas/1789326659454-BOE-A-1985-5392-consolidado_tema.pdf",
-            "sha": "baee88e26bc1ee688d4a6e26f3c5ce0c59fc8cab",
-            "url": "https://raw.githubusercontent.com/andrewva80/Mi-opo/main/files/comun/t_mu06vmzg/esquemas/1789326659454-BOE-A-1985-5392-consolidado_tema.pdf",
-            "tipo": "application/pdf",
-            "tamano": 2292260,
-            "subidoEl": "2026-09-13T19:11:12.640Z"
-          }
-        ],
+        "esquemas": [],
         "ejercicios": [],
         "examenes": []
       }
