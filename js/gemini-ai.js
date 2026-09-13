@@ -20,7 +20,7 @@ const GeminiAI = (() => {
     return !!apiKey;
   }
 
-  async function callGemini(contents, systemText, jsonMode = false) {
+  async function callGemini(contents, systemText, jsonMode = false, intentosRestantes = 3) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
     const generationConfig = {
       maxOutputTokens: 8192,
@@ -32,21 +32,46 @@ const GeminiAI = (() => {
       thinkingConfig: { thinkingBudget: 0 },
     };
     if (jsonMode) generationConfig.responseMimeType = "application/json";
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        contents,
-        system_instruction: systemText ? { parts: [{ text: systemText }] } : undefined,
-        generationConfig,
-      }),
-    });
+    let res;
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
+        body: JSON.stringify({
+          contents,
+          system_instruction: systemText ? { parts: [{ text: systemText }] } : undefined,
+          generationConfig,
+        }),
+      });
+    } catch (e) {
+      // Fallo de red real (conexión cortada, "Load failed"...), no un error de la API.
+      if (intentosRestantes > 1) {
+        await new Promise((r) => setTimeout(r, 1200));
+        return callGemini(contents, systemText, jsonMode, intentosRestantes - 1);
+      }
+      throw new Error(
+        "Fallo de conexión al mandar los archivos a Gemini. Si el tema tiene varios PDFs grandes, prueba a preguntar con menos material a la vez, o revisa tu wifi."
+      );
+    }
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data?.error?.message || `Error de la API de Gemini (${res.status})`);
+      // 429 = límite de peticiones alcanzado, 503 = servidores de Gemini saturados.
+      // Ambos son temporales, así que merece la pena reintentar solo antes de rendirse.
+      const esTemporal = res.status === 429 || res.status === 503;
+      if (esTemporal && intentosRestantes > 1) {
+        const espera = (4 - intentosRestantes) * 2000 + 1000; // 3s, 5s, 7s...
+        await new Promise((r) => setTimeout(r, espera));
+        return callGemini(contents, systemText, jsonMode, intentosRestantes - 1);
+      }
+      const mensaje = data?.error?.message || `Error de la API de Gemini (${res.status})`;
+      throw new Error(
+        esTemporal
+          ? `${mensaje} Gemini está saturado ahora mismo; lo he reintentado varias veces sin suerte. Espera un minuto y vuelve a intentarlo.`
+          : mensaje
+      );
     }
     const candidato = data.candidates?.[0];
     if (!candidato) {
