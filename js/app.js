@@ -194,7 +194,7 @@ function cablearEventosApp() {
   document.getElementById("btn-marcar-repasado").addEventListener("click", marcarRepasadoHoy);
   document.getElementById("btn-borrar-tema").addEventListener("click", borrarTemaActivo);
   document.getElementById("btn-generar-examen").addEventListener("click", generarExamen);
-  document.getElementById("btn-generar-resumen").addEventListener("click", generarResumenTema);
+  document.getElementById("btn-mapa-mental").addEventListener("click", generarMapaMental);
   document.getElementById("btn-revisar-errores").addEventListener("click", revisarErroresTema);
 
   document.getElementById("chat-form").addEventListener("submit", (e) => {
@@ -973,12 +973,12 @@ function construirTextoResultadoExamen(tema, ex, correctas, total) {
   return lineas.join("\n");
 }
 
-async function generarResumenTema() {
+async function generarMapaMental() {
   if (!GeminiAI.isReady()) { alert("Falta la API key de Gemini en la configuración."); return; }
   const { tema, bloque } = buscarTema(estado.temaActivoId);
-  const btn = document.getElementById("btn-generar-resumen");
+  const btn = document.getElementById("btn-mapa-mental");
   const textoOriginalBtn = btn.textContent;
-  btn.textContent = "Generando resumen...";
+  btn.textContent = "Generando mapa mental...";
   btn.disabled = true;
   try {
     const candidatosResumen = [...tema.archivos.esquemas.slice(-4), ...tema.archivos.ejercicios.slice(-2)];
@@ -988,43 +988,64 @@ async function generarResumenTema() {
     const esquemas = await descargarArchivosParaIA(tema.archivos.esquemas);
     const ejercicios = await descargarArchivosParaIA(tema.archivos.ejercicios, 2);
     if (esquemas.length === 0 && ejercicios.length === 0) {
-      alert("Sube al menos un esquema o ejercicio a este tema para poder generar el resumen.");
+      alert("Sube al menos un esquema o ejercicio a este tema para poder generar el mapa mental.");
       return;
     }
-    const texto = await GeminiAI.generarResumen(tema.nombre, esquemas, ejercicios);
-    abrirModal(`
-      <h2 style="margin-bottom:14px;">Resumen — ${escapeHtml(tema.nombre)}</h2>
-      <div style="font-size:0.9rem; line-height:1.6; max-height:50vh; overflow-y:auto; margin-bottom:16px; background:var(--ink); border-radius:6px; padding:12px;">${formatearMarkdown(texto)}</div>
-      <div style="display:flex; gap:10px; flex-wrap:wrap;">
-        <button class="btn btn-primary" id="guardar-resumen">Guardar como archivo en Esquemas</button>
-        <button class="btn btn-ghost" id="cerrar-resumen">Cerrar sin guardar</button>
-      </div>
-    `);
-    document.getElementById("cerrar-resumen").addEventListener("click", cerrarModal);
-    document.getElementById("guardar-resumen").addEventListener("click", async (e) => {
-      const btnGuardar = e.currentTarget;
-      btnGuardar.textContent = "Guardando...";
-      btnGuardar.disabled = true;
-      try {
-        const nombreArchivo = `Resumen - ${tema.nombre}.md`;
-        const meta = await GitHubStorage.uploadTextFile(bloque, tema.id, "esquemas", nombreArchivo, texto);
-        tema.archivos.esquemas.push(meta);
-        setSyncStatus("guardando...");
-        await guardarIndice(`Añade resumen generado a "${tema.nombre}"`);
-        setSyncStatus("sincronizado");
-        cerrarModal();
-        if (estado.categoriaActiva === "esquemas") renderFileList("esquemas");
-      } catch (err) {
-        alert(err.message);
-        btnGuardar.textContent = "Guardar como archivo en Esquemas";
-        btnGuardar.disabled = false;
-      }
-    });
+    const texto = await GeminiAI.generarMapaMental(tema.nombre, esquemas, ejercicios);
+    mostrarMapaMental(texto, tema, bloque);
   } catch (e) {
     alert(e.message);
   } finally {
     btn.textContent = textoOriginalBtn;
     btn.disabled = false;
+  }
+}
+
+function mostrarMapaMental(markdown, tema, bloque) {
+  const markdownSeguro = markdown.replace(/<\/script/gi, "<\\/script");
+  abrirModal(
+    `
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:12px;">
+        <h2 style="margin:0;">🧠 ${escapeHtml(tema.nombre)}</h2>
+        <button id="cerrar-mapa-mental" class="btn btn-ghost" style="flex-shrink:0;">Cerrar</button>
+      </div>
+      <p style="font-size:0.76rem; color:rgba(241,237,228,0.5); margin-bottom:8px;">
+        Toca un nodo para plegarlo/desplegarlo. Puedes hacer zoom y arrastrar para moverte por el mapa.
+      </p>
+      <div class="markmap" id="contenedor-mapa-mental">
+        <script type="text/template">${markdownSeguro}</script>
+      </div>
+      <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">
+        <button class="btn btn-primary" id="guardar-mapa-mental">Guardar como archivo en Esquemas</button>
+      </div>
+    `,
+    "ancho"
+  );
+  document.getElementById("cerrar-mapa-mental").addEventListener("click", cerrarModal);
+  document.getElementById("guardar-mapa-mental").addEventListener("click", async (e) => {
+    const btnGuardar = e.currentTarget;
+    btnGuardar.textContent = "Guardando...";
+    btnGuardar.disabled = true;
+    try {
+      const nombreArchivo = `Mapa mental - ${tema.nombre}.md`;
+      const meta = await GitHubStorage.uploadTextFile(bloque, tema.id, "esquemas", nombreArchivo, markdown);
+      tema.archivos.esquemas.push(meta);
+      setSyncStatus("guardando...");
+      await guardarIndice(`Añade mapa mental generado a "${tema.nombre}"`);
+      setSyncStatus("sincronizado");
+      if (estado.categoriaActiva === "esquemas") renderFileList("esquemas");
+      btnGuardar.textContent = "Guardado ✓";
+    } catch (err) {
+      alert(err.message);
+      btnGuardar.textContent = "Guardar como archivo en Esquemas";
+      btnGuardar.disabled = false;
+    }
+  });
+  // markmap está en modo manual (lo configuramos así en index.html) porque
+  // este contenedor no existe todavía cuando la librería carga la página;
+  // hay que decirle explícitamente que lo dibuje ahora.
+  if (window.markmap && window.markmap.autoLoader) {
+    window.markmap.autoLoader.renderAll();
   }
 }
 
@@ -1297,8 +1318,10 @@ function agregarMensajeChat(rol, texto) {
 
 // ---------- Modal genérico ----------
 
-function abrirModal(html) {
-  document.getElementById("modal-content").innerHTML = html;
+function abrirModal(html, variante) {
+  const modal = document.getElementById("modal-content");
+  modal.innerHTML = html;
+  modal.classList.toggle("ancho", variante === "ancho");
   document.getElementById("modal-overlay").classList.remove("hidden");
 }
 function cerrarModal() {
