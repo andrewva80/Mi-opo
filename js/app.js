@@ -1002,7 +1002,19 @@ async function generarMapaMental() {
 }
 
 function mostrarMapaMental(markdown, tema, bloque) {
-  const markdownSeguro = markdown.replace(/<\/script/gi, "<\\/script");
+  // Configuración de markmap: empieza con solo 2 niveles desplegados (lo demás
+  // plegado, para no saturar de golpe), más aire entre nodos, y envuelve las
+  // líneas largas en vez de dejarlas como una única línea horizontal enorme.
+  const configuracion = `---
+markmap:
+  initialExpandLevel: 2
+  spacingVertical: 14
+  spacingHorizontal: 90
+  maxWidth: 260
+  colorFreezeLevel: 2
+---
+`;
+  const markdownSeguro = configuracion + markdown.replace(/<\/script/gi, "<\\/script");
   abrirModal(
     `
       <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:12px;">
@@ -1010,7 +1022,7 @@ function mostrarMapaMental(markdown, tema, bloque) {
         <button id="cerrar-mapa-mental" class="btn btn-ghost" style="flex-shrink:0;">Cerrar</button>
       </div>
       <p style="font-size:0.76rem; color:rgba(241,237,228,0.5); margin-bottom:8px;">
-        Toca un nodo para plegarlo/desplegarlo. Puedes hacer zoom y arrastrar para moverte por el mapa.
+        Empieza plegado a los 2 primeros niveles. Toca un nodo (el circulito) para desplegar esa rama. Puedes hacer zoom y arrastrar para moverte por el mapa.
       </p>
       <div class="markmap" id="contenedor-mapa-mental">
         <script type="text/template">${markdownSeguro}</script>
