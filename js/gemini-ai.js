@@ -146,12 +146,17 @@ Devuelve EXCLUSIVAMENTE un array JSON válido, sin texto antes ni después, con 
     return datos;
   }
 
-  async function generarResumen(temaNombre, archivosEsquemas, archivosEjercicios) {
+  async function generarMapaMental(temaNombre, archivosEsquemas, archivosEjercicios) {
     const blocks = [...filesToBlocks(archivosEsquemas), ...filesToBlocks(archivosEjercicios)];
-    const instruccion = `Basándote en el material adjunto del tema "${temaNombre}", genera un resumen/esquema mental
-claro y bien organizado en formato Markdown (títulos con #, subtítulos, listas, **negrita** en los conceptos clave).
-Debe servir como material de repaso rápido antes del examen: prioriza estructura y jerarquía de ideas sobre prosa larga.
-No añadas comentarios fuera del propio resumen (nada de "aquí tienes tu resumen"), empieza directamente con el título.`;
+    const instruccion = `Basándote en el material adjunto del tema "${temaNombre}", genera la estructura de un MAPA MENTAL en formato Markdown, pensado para renderizarse como diagrama interactivo (no para leerse como texto corrido).
+
+Reglas estrictas de formato:
+- La primera línea es un único "# ${temaNombre}" como nodo raíz.
+- Debajo, usa "##" para las ramas principales (los bloques grandes del tema) y "###", "####" para subramas, tantos niveles como haga falta para reflejar bien la jerarquía real del contenido.
+- Cada nodo debe ser una frase muy corta o un concepto (pocas palabras), NUNCA un párrafo. Si un dato necesita más detalle, ponlo como una lista con "-" colgando de ese nodo, con líneas también cortas.
+- Usa **negrita** en cifras, plazos o términos clave dentro de cada nodo.
+- No repitas el nombre del tema dentro de las ramas.
+- No añadas explicaciones fuera de la propia estructura (nada de "aquí tienes tu mapa"), empieza directamente con la línea "#".`;
     const contents = [{ role: "user", parts: [...blocks, { text: instruccion }] }];
     return callGemini(contents, SYSTEM_BASE);
   }
@@ -181,5 +186,5 @@ Sé conciso y ve al grano.`;
     return callGemini(contents, SYSTEM_BASE);
   }
 
-  return { init, isReady, chatSobreTema, generarExamenInteractivo, generarResumen, revisarErrores, compararTemas };
+  return { init, isReady, chatSobreTema, generarExamenInteractivo, generarMapaMental, revisarErrores, compararTemas };
 })();
