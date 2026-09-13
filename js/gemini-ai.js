@@ -153,6 +153,7 @@ Devuelve EXCLUSIVAMENTE un array JSON válido, sin texto antes ni después, con 
 Reglas estrictas de formato:
 - La primera línea es un único "# ${temaNombre}" como nodo raíz.
 - Debajo, usa "##" para las ramas principales (los bloques grandes del tema) y "###", "####" para subramas, tantos niveles como haga falta para reflejar bien la jerarquía real del contenido.
+- IMPORTANTE: cubre TODOS los apartados y subapartados del material (todas las letras a), b), c)... y todos los puntos numerados), sin saltarte ninguno aunque parezca menor. Puedes resumir cada uno en pocas palabras, pero no puedes omitirlo por completo — la estructura debe reflejar el articulado entero, no una selección de "lo más importante".
 - Cada nodo debe ser una frase muy corta o un concepto (pocas palabras), NUNCA un párrafo. Si un dato necesita más detalle, ponlo como una lista con "-" colgando de ese nodo, con líneas también cortas.
 - Usa **negrita** en cifras, plazos o términos clave dentro de cada nodo.
 - No repitas el nombre del tema dentro de las ramas.
