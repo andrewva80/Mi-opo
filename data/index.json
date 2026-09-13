@@ -38,17 +38,7 @@
       "carpeta": "Leyes",
       "ultimaRevision": null,
       "archivos": {
-        "esquemas": [
-          {
-            "nombre": "ley base regimen local.pdf",
-            "path": "files/comun/t_mtshpy4y/esquemas/1789327915620-ley_base_regimen_local.pdf",
-            "sha": "e06145720f8ba32bb5a8596bf744cd8e5fbb9b48",
-            "url": "https://raw.githubusercontent.com/andrewva80/Mi-opo/main/files/comun/t_mtshpy4y/esquemas/1789327915620-ley_base_regimen_local.pdf",
-            "tipo": "application/pdf",
-            "tamano": 3354293,
-            "subidoEl": "2026-09-13T19:32:00.487Z"
-          }
-        ],
+        "esquemas": [],
         "ejercicios": [],
         "examenes": []
       }
