@@ -32,6 +32,8 @@ const GeminiAI = (() => {
       thinkingConfig: { thinkingBudget: 0 },
     };
     if (jsonMode) generationConfig.responseMimeType = "application/json";
+    const controlador = new AbortController();
+    const limiteTiempo = setTimeout(() => controlador.abort(), 75000); // 75s como mucho por intento
     let res;
     try {
       res = await fetch(url, {
@@ -45,16 +47,23 @@ const GeminiAI = (() => {
           system_instruction: systemText ? { parts: [{ text: systemText }] } : undefined,
           generationConfig,
         }),
+        signal: controlador.signal,
       });
     } catch (e) {
-      // Fallo de red real (conexión cortada, "Load failed"...), no un error de la API.
+      const fueTimeout = e.name === "AbortError";
+      // Fallo de red real (conexión cortada, "Load failed"...) o se ha quedado
+      // colgada más de 75s sin responder. En ambos casos merece la pena reintentar.
       if (intentosRestantes > 1) {
         await new Promise((r) => setTimeout(r, 1200));
         return callGemini(contents, systemText, jsonMode, intentosRestantes - 1);
       }
       throw new Error(
-        "Fallo de conexión al mandar los archivos a Gemini. Si el tema tiene varios PDFs grandes, prueba a preguntar con menos material a la vez, o revisa tu wifi."
+        fueTimeout
+          ? "Gemini ha tardado más de 75 segundos sin responder, varias veces seguidas. Con diapositivas muy pesadas puede pasar — prueba a desmarcar algún archivo, o inténtalo de nuevo en un rato."
+          : "Fallo de conexión al mandar los archivos a Gemini. Si el tema tiene varios PDFs grandes, prueba a preguntar con menos material a la vez, o revisa tu wifi."
       );
+    } finally {
+      clearTimeout(limiteTiempo);
     }
     const data = await res.json();
     if (!res.ok) {
