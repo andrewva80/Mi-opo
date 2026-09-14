@@ -38,7 +38,17 @@
       "carpeta": "Leyes",
       "ultimaRevision": null,
       "archivos": {
-        "esquemas": [],
+        "esquemas": [
+          {
+            "nombre": "Ley 31_95 Prevención de riesgos laborales v2.pdf",
+            "path": "files/comun/t_mtshpy4y/esquemas/1789376869723-Ley_31_95_Prevencio_n_de_riesgos_laborales_v2.pdf",
+            "sha": "9d8096c79a76854357a364065066e3a6e74296c4",
+            "url": "https://raw.githubusercontent.com/andrewva80/Mi-opo/main/files/comun/t_mtshpy4y/esquemas/1789376869723-Ley_31_95_Prevencio_n_de_riesgos_laborales_v2.pdf",
+            "tipo": "application/pdf",
+            "tamano": 13943268,
+            "subidoEl": "2026-09-14T09:07:56.089Z"
+          }
+        ],
         "ejercicios": [],
         "examenes": []
       }
