@@ -111,9 +111,9 @@ const GeminiAI = (() => {
 Ayudas al opositor con su temario de IVASPE, legislación, geografía y procedimientos.
 Sé claro, directo y pedagógico. Cuando corrijas ejercicios o exámenes, señala exactamente
 qué falló y por qué, sin dar rodeos. Responde en español.
-IMPORTANTE: nunca uses notación LaTeX ni símbolos matemáticos en código (nada de $...$, \\times, \\text{}, ^\\circ, etc.).
-El texto se muestra tal cual, sin renderizar fórmulas, así que escribe cifras y unidades en
-texto normal: "40 x 30 cm", "110°C", "160 km/h", etc.`;
+IMPORTANTE: nunca uses notacion matematica en codigo ni formulas con simbolos especiales.
+El texto se muestra tal cual, sin renderizar formulas, asi que escribe cifras y unidades en
+texto normal y corriente: 40 por 30 centimetros, 110 grados C, 160 km por hora, etc.`;
 
   async function chatSobreTema(pregunta, temaNombre, archivosContexto, historial) {
     const blocks = filesToBlocks(archivosContexto);
@@ -192,4 +192,3 @@ Sé conciso y ve al grano.`;
 
   return { init, isReady, chatSobreTema, generarExamenInteractivo, generarMapaMental, revisarErrores, compararTemas };
 })();
-
