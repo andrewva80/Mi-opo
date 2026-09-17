@@ -132,7 +132,17 @@
       "carpeta": "IVASPE",
       "ultimaRevision": null,
       "archivos": {
-        "esquemas": [],
+        "esquemas": [
+          {
+            "nombre": "IVASPE.pdf",
+            "path": "files/comun/t_mu5h0bf6/esquemas/1789646010047-IVASPE.pdf",
+            "sha": "4ab5ec4a24693c8ab9dc08a1c517ee723071f38c",
+            "url": "https://raw.githubusercontent.com/andrewva80/Mi-opo/main/files/comun/t_mu5h0bf6/esquemas/1789646010047-IVASPE.pdf",
+            "tipo": "application/pdf",
+            "tamano": 1584368,
+            "subidoEl": "2026-09-17T11:53:32.748Z"
+          }
+        ],
         "ejercicios": [],
         "examenes": []
       }
