@@ -123,6 +123,7 @@ async function recargarIndice() {
   }
   renderSidebar();
   renderAvisos();
+  if (!estado.temaActivoId) renderPanelInicio();
 }
 
 async function guardarIndice(mensaje) {
@@ -195,6 +196,7 @@ function cablearEventosApp() {
   document.getElementById("btn-borrar-tema").addEventListener("click", borrarTemaActivo);
   document.getElementById("btn-generar-examen").addEventListener("click", generarExamen);
   document.getElementById("btn-mapa-mental").addEventListener("click", generarMapaMental);
+  document.getElementById("btn-flashcards").addEventListener("click", generarFlashcards);
   document.getElementById("btn-revisar-errores").addEventListener("click", revisarErroresTema);
 
   document.getElementById("chat-form").addEventListener("submit", (e) => {
@@ -431,8 +433,60 @@ async function vaciarHistorialChat() {
 }
 
 function mostrarVacio() {
+  renderPanelInicio();
   document.getElementById("empty-state").classList.remove("hidden");
   document.getElementById("tema-view").classList.add("hidden");
+}
+
+function renderPanelInicio() {
+  const cont = document.getElementById("empty-state-contenido");
+  let totalTemas = 0, alDia = 0;
+  const atrasados = [];
+  ["comun", "alicante", "valencia"].forEach((bloque) => {
+    todosTemasBloque(bloque).forEach((tema) => {
+      totalTemas++;
+      const dias = diasDesde(tema.ultimaRevision);
+      if (dias >= DIAS_AVISO) atrasados.push({ tema, dias, bloque });
+      else alDia++;
+    });
+  });
+
+  if (totalTemas === 0) {
+    cont.innerHTML = `<p style="color:rgba(241,237,228,0.5); font-size:0.95rem;">Crea tu primer tema en el lateral para empezar a subir material.</p>`;
+    return;
+  }
+
+  atrasados.sort((a, b) => b.dias - a.dias);
+  const pctAlDia = Math.round((alDia / totalTemas) * 100);
+  const peor = atrasados[0];
+
+  const tarjeta = (valor, etiqueta, color) => `
+    <div style="background:var(--ink-soft); border:1px solid var(--line-strong); border-radius:8px; padding:14px 16px; flex:1; min-width:110px;">
+      <div style="font-size:1.5rem; font-weight:700; color:${color || "var(--paper)"};">${valor}</div>
+      <div style="font-size:0.74rem; color:rgba(241,237,228,0.55); margin-top:2px;">${etiqueta}</div>
+    </div>`;
+
+  cont.innerHTML = `
+    <p style="color:rgba(241,237,228,0.5); font-size:0.85rem; margin-bottom:16px;">Elige un tema en el lateral, o mira cómo vas:</p>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px; max-width:480px;">
+      ${tarjeta(totalTemas, "temas en total")}
+      ${tarjeta(pctAlDia + "%", "al día", pctAlDia >= 70 ? "#4caf7d" : pctAlDia >= 40 ? "var(--amber)" : "var(--danger)")}
+      ${tarjeta(atrasados.length, "pendientes de repaso", atrasados.length > 0 ? "var(--amber)" : "var(--paper)")}
+    </div>
+    ${
+      peor
+        ? `<div id="ir-a-peor-tema" style="cursor:pointer; max-width:480px; background:rgba(224,164,88,0.08); border:1px solid rgba(224,164,88,0.3); border-radius:8px; padding:14px 16px;">
+            <div style="font-size:0.72rem; color:var(--amber); margin-bottom:4px;">🔥 El que más lo necesita</div>
+            <div style="font-size:0.92rem;">${emojiTema(peor.tema)} ${escapeHtml(peor.tema.nombre)}</div>
+            <div style="font-size:0.76rem; color:rgba(241,237,228,0.5); margin-top:2px;">${peor.dias === Infinity ? "nunca repasado" : `sin repasar hace ${peor.dias} días`} — toca para abrirlo</div>
+          </div>`
+        : `<div style="max-width:480px; font-size:0.85rem; color:rgba(241,237,228,0.5);">🎉 Todo al día, ¡buen trabajo!</div>`
+    }
+  `;
+
+  if (peor) {
+    document.getElementById("ir-a-peor-tema").addEventListener("click", () => abrirTema(peor.tema.id, peor.bloque));
+  }
 }
 
 function mostrarTemaView() {
@@ -1061,6 +1115,124 @@ markmap:
   }
 }
 
+// ---------- Flashcards ----------
+
+async function generarFlashcards() {
+  if (!GeminiAI.isReady()) { alert("Falta la API key de Gemini en la configuración."); return; }
+  const { tema } = buscarTema(estado.temaActivoId);
+  const btn = document.getElementById("btn-flashcards");
+  const textoOriginalBtn = btn.textContent;
+  btn.textContent = "Generando tarjetas...";
+  btn.disabled = true;
+  try {
+    const candidatos = tema.archivos.esquemas.slice(-4);
+    const avisoTamano = comprobarTamanoConjunto(candidatos);
+    if (avisoTamano) { alert(avisoTamano); return; }
+
+    const esquemas = await descargarArchivosParaIA(tema.archivos.esquemas);
+    if (esquemas.length === 0) {
+      alert("Sube al menos un esquema a este tema para poder generar tarjetas de repaso.");
+      return;
+    }
+    const tarjetas = await GeminiAI.generarFlashcards(tema.nombre, esquemas);
+    iniciarFlashcards(tarjetas, tema);
+  } catch (e) {
+    alert(e.message);
+  } finally {
+    btn.textContent = textoOriginalBtn;
+    btn.disabled = false;
+  }
+}
+
+function iniciarFlashcards(tarjetas, tema, soloEstasIds = null) {
+  const mazo = soloEstasIds ? tarjetas.filter((_, i) => soloEstasIds.includes(i)) : tarjetas;
+  const fc = {
+    todas: tarjetas, // el set completo original, para poder reintentar las falladas
+    mazo, // las que se están repasando ahora mismo
+    indice: 0,
+    volteada: false,
+    sabidas: [],
+    noSabidas: [],
+  };
+  renderFlashcard(fc, tema);
+}
+
+function renderFlashcard(fc, tema) {
+  const t = fc.mazo[fc.indice];
+  const progreso = `${fc.indice + 1} / ${fc.mazo.length}`;
+
+  abrirModal(`
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:14px;">
+      <h2 style="margin:0; font-size:1.05rem;">🗂️ ${escapeHtml(tema.nombre)}</h2>
+      <span class="badge">${progreso}</span>
+    </div>
+    <div class="flashcard${fc.volteada ? " dorso" : ""}" id="tarjeta-actual">
+      <div class="flashcard-cara">${escapeHtml(fc.volteada ? t.dorso : t.frente)}</div>
+      ${!fc.volteada ? '<div class="flashcard-pista">toca para ver la respuesta</div>' : ""}
+    </div>
+    ${
+      fc.volteada
+        ? `<div style="display:flex; gap:10px; margin-top:16px;">
+            <button id="fc-no-sabia" class="btn" style="flex:1; background:var(--danger); color:var(--paper); border:none;">😖 No lo sabía</button>
+            <button id="fc-sabia" class="btn btn-primary" style="flex:1;">✅ Lo sabía</button>
+          </div>`
+        : ""
+    }
+    <button id="fc-salir" class="btn btn-ghost" style="margin-top:14px;">Salir</button>
+  `);
+
+  document.getElementById("tarjeta-actual").addEventListener("click", () => {
+    if (fc.volteada) return;
+    fc.volteada = true;
+    renderFlashcard(fc, tema);
+  });
+  const btnSabia = document.getElementById("fc-sabia");
+  const btnNoSabia = document.getElementById("fc-no-sabia");
+  if (btnSabia) btnSabia.addEventListener("click", () => avanzarFlashcard(fc, tema, true));
+  if (btnNoSabia) btnNoSabia.addEventListener("click", () => avanzarFlashcard(fc, tema, false));
+  document.getElementById("fc-salir").addEventListener("click", () => {
+    if (confirm("¿Salir del repaso? Perderás el progreso de esta ronda.")) cerrarModal();
+  });
+}
+
+function avanzarFlashcard(fc, tema, sabida) {
+  const t = fc.mazo[fc.indice];
+  (sabida ? fc.sabidas : fc.noSabidas).push(t);
+  if (fc.indice + 1 < fc.mazo.length) {
+    fc.indice++;
+    fc.volteada = false;
+    renderFlashcard(fc, tema);
+  } else {
+    mostrarResultadoFlashcards(fc, tema);
+  }
+}
+
+function mostrarResultadoFlashcards(fc, tema) {
+  const total = fc.sabidas.length + fc.noSabidas.length;
+  abrirModal(`
+    <h2 style="margin-bottom:6px;">Repaso completado — ${escapeHtml(tema.nombre)}</h2>
+    <p style="font-size:1.15rem; font-weight:700; margin-bottom:16px;">✅ ${fc.sabidas.length} sabidas · 😖 ${fc.noSabidas.length} por repasar</p>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      ${
+        fc.noSabidas.length > 0
+          ? `<button id="fc-repasar-falladas" class="btn btn-primary">Repasar solo las ${fc.noSabidas.length} que fallé</button>`
+          : ""
+      }
+      <button id="fc-repasar-todas" class="btn btn-secondary">Repasar el mazo entero otra vez</button>
+      <button id="fc-cerrar-resultado" class="btn btn-ghost">Cerrar</button>
+    </div>
+  `);
+  document.getElementById("fc-cerrar-resultado").addEventListener("click", cerrarModal);
+  document.getElementById("fc-repasar-todas").addEventListener("click", () => iniciarFlashcards(fc.todas, tema));
+  const btnFalladas = document.getElementById("fc-repasar-falladas");
+  if (btnFalladas) {
+    btnFalladas.addEventListener("click", () => {
+      const idsFalladas = fc.todas.map((t, i) => (fc.noSabidas.includes(t) ? i : -1)).filter((i) => i >= 0);
+      iniciarFlashcards(fc.todas, tema, idsFalladas);
+    });
+  }
+}
+
 async function revisarErroresTema() {
   if (!GeminiAI.isReady()) { alert("Falta la API key de Gemini en la configuración."); return; }
   const { tema } = buscarTema(estado.temaActivoId);
@@ -1137,20 +1309,30 @@ function abrirModalProgreso() {
 
   atrasados.sort((a, b) => b.dias - a.dias);
 
-  const celda = (contenido, alinear = "left") =>
-    `<td style="padding:7px 10px 7px 0; border-bottom:1px solid var(--line); text-align:${alinear};">${contenido}</td>`;
+  const barraHtml = (p, color) => `
+    <div style="background:var(--ink); border-radius:6px; height:8px; overflow:hidden;">
+      <div style="width:${p}%; height:100%; background:${color}; border-radius:6px; transition:width 0.4s ease;"></div>
+    </div>`;
+  const colorParaPct = (p) => (p >= 70 ? "#4caf7d" : p >= 40 ? "var(--amber)" : "var(--danger)");
 
-  const filasBloque = bloques
+  const pctGeneral = pct(totalRepasados, totalTemas);
+  const tarjetasBloque = bloques
     .filter((b) => statsPorBloque[b].total > 0)
     .map((b) => {
       const s = statsPorBloque[b];
-      return `<tr>
-        ${celda(nombreBloque[b])}
-        ${celda(s.total, "center")}
-        ${celda(pct(s.repasados, s.total) + "%", "center")}
-        ${celda(s.pendientes, "center")}
-        ${celda(s.archivos, "center")}
-      </tr>`;
+      const p = pct(s.repasados, s.total);
+      return `<div style="margin-bottom:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; font-size:0.85rem; margin-bottom:5px;">
+          <span>${nombreBloque[b]}</span>
+          <span style="color:rgba(241,237,228,0.55); font-size:0.78rem;">${p}% repasado</span>
+        </div>
+        ${barraHtml(p, colorParaPct(p))}
+        <div style="display:flex; gap:16px; font-size:0.72rem; color:rgba(241,237,228,0.45); margin-top:5px;">
+          <span>${s.total} temas</span>
+          <span>${s.pendientes > 0 ? "⚠️ " : ""}${s.pendientes} atrasados</span>
+          <span>${s.archivos} archivos</span>
+        </div>
+      </div>`;
     })
     .join("");
 
@@ -1169,25 +1351,19 @@ function abrirModalProgreso() {
         </ul>`;
 
   abrirModal(`
-    <h2 style="margin-bottom:6px;">📊 Progreso general</h2>
-    <p style="color:rgba(241,237,228,0.55); font-size:0.8rem; margin-bottom:18px;">
-      ${totalTemas} temas en total · ${pct(totalRepasados, totalTemas)}% repasados alguna vez · ${totalPendientes} pendientes · ${totalArchivos} archivos subidos
-    </p>
+    <h2 style="margin-bottom:14px;">📊 Progreso general</h2>
 
-    <table style="width:100%; border-collapse:collapse; font-size:0.85rem; margin-bottom:24px;">
-      <thead>
-        <tr style="text-align:left; color:rgba(241,237,228,0.5); font-size:0.72rem;">
-          <th style="padding-bottom:8px; font-weight:500;">Bloque</th>
-          <th style="padding-bottom:8px; font-weight:500; text-align:center;">Temas</th>
-          <th style="padding-bottom:8px; font-weight:500; text-align:center;">% repasado</th>
-          <th style="padding-bottom:8px; font-weight:500; text-align:center;">Atrasados</th>
-          <th style="padding-bottom:8px; font-weight:500; text-align:center;">Archivos</th>
-        </tr>
-      </thead>
-      <tbody>${filasBloque || `<tr>${celda("Todavía no hay temas creados.")}</tr>`}</tbody>
-    </table>
+    <div style="margin-bottom:22px;">
+      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;">
+        <span style="font-size:1.4rem; font-weight:700;">${pctGeneral}%</span>
+        <span style="font-size:0.78rem; color:rgba(241,237,228,0.55);">${totalTemas} temas · ${totalPendientes} pendientes · ${totalArchivos} archivos</span>
+      </div>
+      ${barraHtml(pctGeneral, colorParaPct(pctGeneral))}
+    </div>
 
-    <h3 style="font-size:0.95rem; margin-bottom:10px;">Más atrasados</h3>
+    ${tarjetasBloque || '<p style="font-size:0.85rem; color:rgba(241,237,228,0.5);">Todavía no hay temas creados.</p>'}
+
+    <h3 style="font-size:0.95rem; margin-bottom:10px; margin-top:6px;">Más atrasados</h3>
     ${listaAtrasados}
 
     <button class="btn btn-ghost" id="cerrar-progreso" style="margin-top:20px;">Cerrar</button>
