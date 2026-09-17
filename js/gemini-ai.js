@@ -146,7 +146,7 @@ Devuelve EXCLUSIVAMENTE un array JSON válido, sin texto antes ni después, con 
 
   async function generarFlashcards(temaNombre, archivosEsquemas) {
     const blocks = filesToBlocks(archivosEsquemas);
-    const instruccion = `Basándote en el material adjunto del tema "${temaNombre}", genera entre 10 y 15 tarjetas de
+    const instruccion = `Basándote en el material adjunto del tema "${temaNombre}", genera exactamente 12 tarjetas de
 repaso activo (estilo Anki/Quizlet) para memorizar los datos y conceptos clave: cifras, plazos, definiciones,
 nombres, procedimientos concretos. Cada tarjeta tiene una cara con una pregunta o pie muy corto, y otra cara
 con la respuesta concisa (una frase o un dato, no un párrafo).
