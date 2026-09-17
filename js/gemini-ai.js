@@ -28,12 +28,13 @@ const GeminiAI = (() => {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`;
     const generationConfig = {
       maxOutputTokens: 8192,
-      // Sin esto, los modelos Gemini "piensan" por dentro antes de responder y ese
-      // pensamiento resta del mismo límite de tokens que la respuesta final — con
-      // límites normales, se puede comer casi todo el presupuesto y cortar la
-      // respuesta real a las primeras frases. Lo desactivamos: aquí no hace falta
-      // razonamiento complejo, solo organizar y redactar el material.
-      thinkingConfig: { thinkingBudget: 0 },
+      // El "pensamiento" interno del modelo resta del mismo límite de tokens
+      // que la respuesta final, así que lo reducimos al mínimo (aquí no hace
+      // falta razonar mucho, solo organizar y redactar el material). Los
+      // modelos Gemini 3 (los actuales) configuran esto con "thinkingLevel"
+      // (low/medium/high) en vez del antiguo "thinkingBudget" numérico —
+      // mandar el formato viejo con un modelo nuevo da "invalid argument".
+      thinkingConfig: { thinkingLevel: "low" },
     };
     if (jsonMode) generationConfig.responseMimeType = "application/json";
     const controlador = new AbortController();
