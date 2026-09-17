@@ -72,16 +72,33 @@ const GeminiAI = (() => {
     const data = await res.json();
     if (!res.ok) {
       // 429 = límite de peticiones alcanzado, 503 = servidores de Gemini saturados.
-      // Ambos son temporales, así que merece la pena reintentar solo antes de rendirse.
-      const esTemporal = res.status === 429 || res.status === 503;
+      const es429 = res.status === 429;
+      const es503 = res.status === 503;
+      const esTemporal = es429 || es503;
+
+      // Si Google nos dice exactamente cuánto esperar (pasa sobre todo en 429),
+      // usamos ese dato en vez de una espera fija a ciegas.
+      const retryInfo = data?.error?.details?.find((d) => d.retryDelay);
+      const segundosSugeridos = retryInfo ? parseFloat(retryInfo.retryDelay) : null;
+
       if (esTemporal && intentosRestantes > 1) {
-        const espera = (4 - intentosRestantes) * 2000 + 1000; // 3s, 5s, 7s...
+        // Si Google pide esperar mucho (con la cuota del minuto agotada, puede
+        // pedir 20-30s), reintentar en bucle solo consume más cuota en vano
+        // en cuanto se libere un hueco. Mejor avisar ya con el tiempo exacto.
+        if (segundosSugeridos && segundosSugeridos > 12) {
+          throw new Error(
+            `Se ha agotado la cuota gratuita de peticiones por minuto. Google pide esperar ${Math.ceil(segundosSugeridos)} segundos antes de volver a intentarlo — es el límite normal del nivel gratuito, no un fallo. Espera un poco y vuelve a intentarlo.`
+          );
+        }
+        const espera = segundosSugeridos ? segundosSugeridos * 1000 + 500 : (4 - intentosRestantes) * 2000 + 1000;
         await new Promise((r) => setTimeout(r, espera));
         return callGemini(contents, systemText, jsonMode, intentosRestantes - 1, modelo);
       }
       const mensaje = data?.error?.message || `Error de la API de Gemini (${res.status})`;
       throw new Error(
-        esTemporal
+        es429
+          ? `${mensaje} Es el límite de peticiones por minuto del nivel gratuito — espera un poco y vuelve a intentarlo.`
+          : esTemporal
           ? `${mensaje} Gemini está saturado ahora mismo; lo he reintentado varias veces sin suerte. Espera un minuto y vuelve a intentarlo.`
           : mensaje
       );
