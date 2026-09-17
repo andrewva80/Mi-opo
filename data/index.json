@@ -144,7 +144,17 @@
           }
         ],
         "ejercicios": [],
-        "examenes": []
+        "examenes": [
+          {
+            "nombre": "Resultado examen - 17/9/2026.md",
+            "path": "files/comun/t_mu5h0bf6/examenes/1789664372312-Resultado_examen_-_17_9_2026.md",
+            "sha": "99c29249d45320c6003a1a815bf50d9557a69a6e",
+            "url": "https://raw.githubusercontent.com/andrewva80/Mi-opo/main/files/comun/t_mu5h0bf6/examenes/1789664372312-Resultado_examen_-_17_9_2026.md",
+            "tamano": 2230,
+            "tipo": "text/markdown",
+            "subidoEl": "2026-09-17T16:59:34.569Z"
+          }
+        ]
       }
     }
   ],
