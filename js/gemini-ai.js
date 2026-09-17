@@ -141,19 +141,32 @@ Devuelve EXCLUSIVAMENTE un array JSON válido, sin texto antes ni después, con 
 "correcta" es el índice (0 a 3) de la opción correcta dentro de "opciones".`;
     const contents = [{ role: "user", parts: [...blocks, { text: instruccion }] }];
     const texto = await callGemini(contents, SYSTEM_BASE, true);
-    return parsearExamenJSON(texto);
+    return parsearArrayJSON(texto, "No se pudo interpretar el examen generado. Prueba a generarlo de nuevo.");
   }
 
-  function parsearExamenJSON(texto) {
+  async function generarFlashcards(temaNombre, archivosEsquemas) {
+    const blocks = filesToBlocks(archivosEsquemas);
+    const instruccion = `Basándote en el material adjunto del tema "${temaNombre}", genera entre 10 y 15 tarjetas de
+repaso activo (estilo Anki/Quizlet) para memorizar los datos y conceptos clave: cifras, plazos, definiciones,
+nombres, procedimientos concretos. Cada tarjeta tiene una cara con una pregunta o pie muy corto, y otra cara
+con la respuesta concisa (una frase o un dato, no un párrafo).
+Devuelve EXCLUSIVAMENTE un array JSON válido, sin texto antes ni después, con este formato exacto:
+[{"frente": "pregunta o pie corto", "dorso": "respuesta concisa"}]`;
+    const contents = [{ role: "user", parts: [...blocks, { text: instruccion }] }];
+    const texto = await callGemini(contents, SYSTEM_BASE, true);
+    return parsearArrayJSON(texto, "No se pudieron interpretar las tarjetas generadas. Prueba a generarlas de nuevo.");
+  }
+
+  function parsearArrayJSON(texto, mensajeError) {
     let limpio = texto.trim().replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/```\s*$/, "");
     let datos;
     try {
       datos = JSON.parse(limpio);
     } catch {
-      throw new Error("No se pudo interpretar el examen generado. Prueba a generarlo de nuevo.");
+      throw new Error(mensajeError);
     }
     if (!Array.isArray(datos) || datos.length === 0) {
-      throw new Error("El examen generado no tiene el formato esperado. Prueba a generarlo de nuevo.");
+      throw new Error(mensajeError);
     }
     return datos;
   }
@@ -199,5 +212,5 @@ Sé conciso y ve al grano.`;
     return callGemini(contents, SYSTEM_BASE);
   }
 
-  return { init, isReady, chatSobreTema, generarExamenInteractivo, generarMapaMental, revisarErrores, compararTemas };
+  return { init, isReady, chatSobreTema, generarExamenInteractivo, generarMapaMental, generarFlashcards, revisarErrores, compararTemas };
 })();
