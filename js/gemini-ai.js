@@ -12,6 +12,10 @@ const GeminiAI = (() => {
   // Alias "sin versión" de Google: siempre apunta al modelo Flash estable
   // más reciente, así no se rompe cuando Google retira una versión concreta.
   const MODEL = "gemini-flash-latest";
+  // Más rápido que el de arriba, pensado para tareas de organizar/estructurar
+  // en vez de razonar en profundidad. Lo usamos solo donde tiene sentido
+  // (mapas mentales), dejando el resto en el modelo normal ya probado.
+  const MODEL_RAPIDO = "gemini-flash-lite-latest";
 
   function init(key) {
     apiKey = key;
@@ -20,8 +24,8 @@ const GeminiAI = (() => {
     return !!apiKey;
   }
 
-  async function callGemini(contents, systemText, jsonMode = false, intentosRestantes = 3) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
+  async function callGemini(contents, systemText, jsonMode = false, intentosRestantes = 3, modelo = MODEL) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`;
     const generationConfig = {
       maxOutputTokens: 8192,
       // Sin esto, los modelos Gemini "piensan" por dentro antes de responder y ese
@@ -55,7 +59,7 @@ const GeminiAI = (() => {
       // colgada más de 75s sin responder. En ambos casos merece la pena reintentar.
       if (intentosRestantes > 1) {
         await new Promise((r) => setTimeout(r, 1200));
-        return callGemini(contents, systemText, jsonMode, intentosRestantes - 1);
+        return callGemini(contents, systemText, jsonMode, intentosRestantes - 1, modelo);
       }
       throw new Error(
         fueTimeout
@@ -73,7 +77,7 @@ const GeminiAI = (() => {
       if (esTemporal && intentosRestantes > 1) {
         const espera = (4 - intentosRestantes) * 2000 + 1000; // 3s, 5s, 7s...
         await new Promise((r) => setTimeout(r, espera));
-        return callGemini(contents, systemText, jsonMode, intentosRestantes - 1);
+        return callGemini(contents, systemText, jsonMode, intentosRestantes - 1, modelo);
       }
       const mensaje = data?.error?.message || `Error de la API de Gemini (${res.status})`;
       throw new Error(
@@ -184,7 +188,7 @@ Reglas estrictas de formato:
 - No repitas el nombre del tema dentro de las ramas.
 - No añadas explicaciones fuera de la propia estructura (nada de "aquí tienes tu mapa"), empieza directamente con la línea "#".`;
     const contents = [{ role: "user", parts: [...blocks, { text: instruccion }] }];
-    return callGemini(contents, SYSTEM_BASE);
+    return callGemini(contents, SYSTEM_BASE, false, 3, MODEL_RAPIDO);
   }
 
   async function revisarErrores(temaNombre, archivosEjerciciosCorregidos) {
