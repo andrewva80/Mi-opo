@@ -11,11 +11,17 @@ const GeminiAI = (() => {
   let apiKey = null;
   // Alias "sin versión" de Google: siempre apunta al modelo Flash estable
   // más reciente, así no se rompe cuando Google retira una versión concreta.
-  const MODEL = "gemini-flash-latest";
+  // Antes usábamos el alias "-latest", que sigue siempre a la versión más
+  // reciente de Google. El problema: cuando sale un modelo nuevo (como pasó
+  // hace poco), el alias salta a él de inmediato, y un modelo recién lanzado
+  // suele estar saturado varios días mientras todo el mundo lo prueba a la
+  // vez — sobre todo en el nivel gratuito. Fijamos una versión concreta ya
+  // madura y estable, para no depender de lo que Google acabe de estrenar.
+  const MODEL = "gemini-2.5-flash";
   // Más rápido que el de arriba, pensado para tareas de organizar/estructurar
   // en vez de razonar en profundidad. Lo usamos solo donde tiene sentido
   // (mapas mentales), dejando el resto en el modelo normal ya probado.
-  const MODEL_RAPIDO = "gemini-flash-lite-latest";
+  const MODEL_RAPIDO = "gemini-2.5-flash-lite";
 
   function init(key) {
     apiKey = key;
@@ -29,12 +35,14 @@ const GeminiAI = (() => {
     const generationConfig = {
       maxOutputTokens: 8192,
       // El "pensamiento" interno del modelo resta del mismo límite de tokens
-      // que la respuesta final, así que lo reducimos al mínimo (aquí no hace
-      // falta razonar mucho, solo organizar y redactar el material). Los
-      // modelos Gemini 3 (los actuales) configuran esto con "thinkingLevel"
-      // (low/medium/high) en vez del antiguo "thinkingBudget" numérico —
-      // mandar el formato viejo con un modelo nuevo da "invalid argument".
-      thinkingConfig: { thinkingLevel: "low" },
+      // que la respuesta final, así que lo desactivamos (aquí no hace falta
+      // razonar mucho, solo organizar y redactar el material). La serie 2.5
+      // (la que usamos ahora, fijada por estabilidad) configura esto con
+      // "thinkingBudget" numérico; 0 lo desactiva del todo. Si en el futuro
+      // se cambia a un modelo de la familia Gemini 3, esto habría que
+      // cambiarlo a "thinkingLevel": "low" (con esos no se puede desactivar
+      // del todo, y mandar el formato equivocado da "invalid argument").
+      thinkingConfig: { thinkingBudget: 0 },
     };
     if (jsonMode) generationConfig.responseMimeType = "application/json";
     const controlador = new AbortController();
