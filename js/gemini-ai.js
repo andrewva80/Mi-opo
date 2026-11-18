@@ -9,9 +9,9 @@
 
 const GeminiAI = (() => {
   let apiKey = null;
-  // Usamos un modelo optimizado y mucho menos saturado para evitar errores de alta demanda
-  const MODEL = "gemini-2.5-flash-lite";
-  const MODEL_RAPIDO = "gemini-2.5-flash-lite";
+  // Actualizado al modelo requerido por Google
+  const MODEL = "gemini-3.5-flash-lite";
+  const MODEL_RAPIDO = "gemini-3.5-flash-lite";
 
   function init(key) {
     apiKey = key;
