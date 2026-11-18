@@ -9,9 +9,9 @@
 
 const GeminiAI = (() => {
   let apiKey = null;
-  // Actualizado al nuevo modelo estable recomendado por Google
-  const MODEL = "gemini-3.8-flash";
-  const MODEL_RAPIDO = "gemini-3.8-flash";
+  // Usamos un modelo optimizado y mucho menos saturado para evitar errores de alta demanda
+  const MODEL = "gemini-2.5-flash-lite";
+  const MODEL_RAPIDO = "gemini-2.5-flash-lite";
 
   function init(key) {
     apiKey = key;
@@ -24,15 +24,11 @@ const GeminiAI = (() => {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`;
     const generationConfig = {
       maxOutputTokens: 8192,
-      // El "pensamiento" interno del modelo resta del mismo límite de tokens
-      // que la respuesta final, así que lo desactivamos (aquí no hace falta
-      // razonar mucho, solo organizar y redactar el material). La serie 2.5/3.8
-      // configura esto con "thinkingBudget" numérico; 0 lo desactiva del todo.
       thinkingConfig: { thinkingBudget: 0 },
     };
     if (jsonMode) generationConfig.responseMimeType = "application/json";
     const controlador = new AbortController();
-    const limiteTiempo = setTimeout(() => controlador.abort(), 75000); // 75s como mucho por intento
+    const limiteTiempo = setTimeout(() => controlador.abort(), 75000);
     let res;
     try {
       res = await fetch(url, {
@@ -56,8 +52,8 @@ const GeminiAI = (() => {
       }
       throw new Error(
         fueTimeout
-          ? "Gemini ha tardado más de 75 segundos sin responder, varias veces seguidas. Con diapositivas muy pesadas puede pasar — prueba a desmarcar algún archivo, o inténtalo de nuevo en un rato."
-          : "Fallo de conexión al mandar los archivos a Gemini. Si el tema tiene varios PDFs grandes, prueba a preguntar con menos material a la vez, o revisa tu wifi."
+          ? "Gemini ha tardado más de 75 segundos sin responder. Prueba a desmarcar algún archivo o inténtalo de nuevo."
+          : "Fallo de conexión al mandar los archivos a Gemini. Revisa tu wifi."
       );
     } finally {
       clearTimeout(limiteTiempo);
@@ -74,7 +70,7 @@ const GeminiAI = (() => {
       if (esTemporal && intentosRestantes > 1) {
         if (segundosSugeridos && segundosSugeridos > 12) {
           throw new Error(
-            `Se ha agotado la cuota gratuita de peticiones por minuto. Google pide esperar ${Math.ceil(segundosSugeridos)} segundos antes de volver a intentarlo — es el límite normal del nivel gratuito, no un fallo. Espera un poco y vuelve a intentarlo.`
+            `Se ha agotado la cuota gratuita temporalmente. Google pide esperar ${Math.ceil(segundosSugeridos)} segundos — espera un poco y vuelve a intentarlo.`
           );
         }
         const espera = segundosSugeridos ? segundosSugeridos * 1000 + 500 : (4 - intentosRestantes) * 2000 + 1000;
@@ -84,9 +80,9 @@ const GeminiAI = (() => {
       const mensaje = data?.error?.message || `Error de la API de Gemini (${res.status})`;
       throw new Error(
         es429
-          ? `${mensaje} Es el límite de peticiones por minuto del nivel gratuito — espera un poco y vuelve a intentarlo.`
+          ? `${mensaje} Es el límite de peticiones del nivel gratuito — espera un momento y vuelve a intentarlo.`
           : esTemporal
-          ? `${mensaje} Gemini está saturado ahora mismo; lo he reintentado varias veces sin suerte. Espera un minuto y vuelve a intentarlo.`
+          ? `${mensaje} El servicio está saturado ahora mismo. Espera un minuto y vuelve a intentarlo.`
           : mensaje
       );
     }
@@ -100,7 +96,7 @@ const GeminiAI = (() => {
       .map((p) => p.text)
       .join("\n");
     if (candidato.finishReason === "MAX_TOKENS") {
-      return texto + "\n\n---\n*(Respuesta cortada por límite de longitud. Si falta algo importante, pídeselo de nuevo o divídelo en menos preguntas a la vez.)*";
+      return texto + "\n\n---\n*(Respuesta cortada por límite de longitud.)*";
     }
     return texto;
   }
