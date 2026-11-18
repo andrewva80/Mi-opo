@@ -9,7 +9,6 @@
 
 const GeminiAI = (() => {
   let apiKey = null;
-  // Actualizado al modelo requerido por Google
   const MODEL = "gemini-3.5-flash-lite";
   const MODEL_RAPIDO = "gemini-3.5-flash-lite";
 
@@ -24,7 +23,6 @@ const GeminiAI = (() => {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent`;
     const generationConfig = {
       maxOutputTokens: 8192,
-      thinkingConfig: { thinkingBudget: 0 },
     };
     if (jsonMode) generationConfig.responseMimeType = "application/json";
     const controlador = new AbortController();
@@ -205,7 +203,7 @@ y dame 3-5 puntos concretos en los que debería repasar antes del examen.`;
       ...filesToBlocks(archivosB),
     ];
     const instruccion = `Compara el material de estos dos temas de oposición. En formato de lista, señala:
-1. Qué conceptos, tablas o datos son prácticamente iguales entre ambos (para no estudiarlos dos veces por separado).
+1. Qué conceptos, tablas o datos son prácticamente iguales entre ambos (para no estudiarlos dois veces por separado).
 2. Qué diferencias clave hay (cifras, plazos, nombres, procedimientos) que se puedan confundir fácilmente en el examen.
 3. Un aviso final con los 2-3 puntos donde más riesgo hay de mezclar datos de un tema con el otro.
 Sé conciso y ve al grano.`;
