@@ -9,19 +9,9 @@
 
 const GeminiAI = (() => {
   let apiKey = null;
-  // Alias "sin versión" de Google: siempre apunta al modelo Flash estable
-  // más reciente, así no se rompe cuando Google retira una versión concreta.
-  // Antes usábamos el alias "-latest", que sigue siempre a la versión más
-  // reciente de Google. El problema: cuando sale un modelo nuevo (como pasó
-  // hace poco), el alias salta a él de inmediato, y un modelo recién lanzado
-  // suele estar saturado varios días mientras todo el mundo lo prueba a la
-  // vez — sobre todo en el nivel gratuito. Fijamos una versión concreta ya
-  // madura y estable, para no depender de lo que Google acabe de estrenar.
-  const MODEL = "gemini-2.5-flash";
-  // Más rápido que el de arriba, pensado para tareas de organizar/estructurar
-  // en vez de razonar en profundidad. Lo usamos solo donde tiene sentido
-  // (mapas mentales), dejando el resto en el modelo normal ya probado.
-  const MODEL_RAPIDO = "gemini-2.5-flash-lite";
+  // Actualizado al nuevo modelo estable recomendado por Google
+  const MODEL = "gemini-3.8-flash";
+  const MODEL_RAPIDO = "gemini-3.8-flash";
 
   function init(key) {
     apiKey = key;
@@ -36,12 +26,8 @@ const GeminiAI = (() => {
       maxOutputTokens: 8192,
       // El "pensamiento" interno del modelo resta del mismo límite de tokens
       // que la respuesta final, así que lo desactivamos (aquí no hace falta
-      // razonar mucho, solo organizar y redactar el material). La serie 2.5
-      // (la que usamos ahora, fijada por estabilidad) configura esto con
-      // "thinkingBudget" numérico; 0 lo desactiva del todo. Si en el futuro
-      // se cambia a un modelo de la familia Gemini 3, esto habría que
-      // cambiarlo a "thinkingLevel": "low" (con esos no se puede desactivar
-      // del todo, y mandar el formato equivocado da "invalid argument").
+      // razonar mucho, solo organizar y redactar el material). La serie 2.5/3.8
+      // configura esto con "thinkingBudget" numérico; 0 lo desactiva del todo.
       thinkingConfig: { thinkingBudget: 0 },
     };
     if (jsonMode) generationConfig.responseMimeType = "application/json";
@@ -64,8 +50,6 @@ const GeminiAI = (() => {
       });
     } catch (e) {
       const fueTimeout = e.name === "AbortError";
-      // Fallo de red real (conexión cortada, "Load failed"...) o se ha quedado
-      // colgada más de 75s sin responder. En ambos casos merece la pena reintentar.
       if (intentosRestantes > 1) {
         await new Promise((r) => setTimeout(r, 1200));
         return callGemini(contents, systemText, jsonMode, intentosRestantes - 1, modelo);
@@ -80,20 +64,14 @@ const GeminiAI = (() => {
     }
     const data = await res.json();
     if (!res.ok) {
-      // 429 = límite de peticiones alcanzado, 503 = servidores de Gemini saturados.
       const es429 = res.status === 429;
       const es503 = res.status === 503;
       const esTemporal = es429 || es503;
 
-      // Si Google nos dice exactamente cuánto esperar (pasa sobre todo en 429),
-      // usamos ese dato en vez de una espera fija a ciegas.
       const retryInfo = data?.error?.details?.find((d) => d.retryDelay);
       const segundosSugeridos = retryInfo ? parseFloat(retryInfo.retryDelay) : null;
 
       if (esTemporal && intentosRestantes > 1) {
-        // Si Google pide esperar mucho (con la cuota del minuto agotada, puede
-        // pedir 20-30s), reintentar en bucle solo consume más cuota en vano
-        // en cuanto se libere un hueco. Mejor avisar ya con el tiempo exacto.
         if (segundosSugeridos && segundosSugeridos > 12) {
           throw new Error(
             `Se ha agotado la cuota gratuita de peticiones por minuto. Google pide esperar ${Math.ceil(segundosSugeridos)} segundos antes de volver a intentarlo — es el límite normal del nivel gratuito, no un fallo. Espera un poco y vuelve a intentarlo.`
@@ -127,8 +105,6 @@ const GeminiAI = (() => {
     return texto;
   }
 
-  // Convierte el historial de chat {role:"user"|"assistant", content} al
-  // formato de Gemini, donde el turno del asistente se llama "model".
   function historialAGemini(historial) {
     return historial.map((m) => ({
       role: m.role === "assistant" ? "model" : "user",
@@ -136,7 +112,6 @@ const GeminiAI = (() => {
     }));
   }
 
-  // Convierte los archivos ya descargados (base64) en "parts" que Gemini entiende
   function filesToBlocks(files) {
     return files.map((f) => {
       if (f.mediaType === "application/pdf" || f.mediaType.startsWith("image/")) {
