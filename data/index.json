@@ -59,7 +59,17 @@
           }
         ],
         "ejercicios": [],
-        "examenes": []
+        "examenes": [
+          {
+            "nombre": "Resultado examen - 18/11/2026.md",
+            "path": "files/comun/t_mtshpy4y/examenes/1794995153253-Resultado_examen_-_18_11_2026.md",
+            "sha": "eeb4de2685df9ffe5a9dc67a663f9a0a10d23fb3",
+            "url": "https://raw.githubusercontent.com/andrewva80/Mi-opo/main/files/comun/t_mtshpy4y/examenes/1794995153253-Resultado_examen_-_18_11_2026.md",
+            "tamano": 2220,
+            "tipo": "text/markdown",
+            "subidoEl": "2026-11-18T09:45:55.816Z"
+          }
+        ]
       }
     },
     {
